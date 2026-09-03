@@ -1,0 +1,36 @@
+{
+  "name": "tcc-observability",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma SaaS de observabilidade para aplicações web.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.0.4",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "db:generate": "pnpm --filter @tcc-observability/database prisma:generate",
+    "db:migrate:deploy": "pnpm --filter @tcc-observability/database prisma:migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @tcc-observability/database prisma:migrate:dev",
+    "db:validate": "pnpm --filter @tcc-observability/database prisma:validate",
+    "predev": "pnpm --filter @tcc-observability/database --filter @tcc-observability/node build",
+    "dev": "pnpm --parallel --filter @tcc-observability/api --filter @tcc-observability/web --filter @tcc-observability/demo dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0"
+  }
+}

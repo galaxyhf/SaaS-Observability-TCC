@@ -1,0 +1,209 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  runtime             = "nodejs"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ServiceType {
+  BROWSER
+  SERVER
+  UNKNOWN
+}
+
+enum TraceStatus {
+  UNSET
+  OK
+  ERROR
+}
+
+enum SpanKind {
+  UNSPECIFIED
+  INTERNAL
+  SERVER
+  CLIENT
+  PRODUCER
+  CONSUMER
+}
+
+enum SpanStatusCode {
+  UNSET
+  OK
+  ERROR
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @db.VarChar(120)
+  email        String        @unique @db.VarChar(320)
+  passwordHash String        @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  sessions     AuthSession[]
+  projects     Project[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.Char(64)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model Project {
+  id             String                 @id @default(uuid()) @db.Uuid
+  userId         String                 @map("user_id") @db.Uuid
+  publicId       String                 @unique @map("public_id") @db.VarChar(80)
+  name           String                 @db.VarChar(120)
+  slug           String                 @db.VarChar(140)
+  websiteUrl     String?                @map("website_url") @db.VarChar(2048)
+  retentionDays  Int                    @default(7) @map("retention_days")
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keys           ProjectKey[]
+  allowedOrigins ProjectAllowedOrigin[]
+  environments   Environment[]
+  services       Service[]
+  traces         Trace[]
+
+  @@unique([userId, slug])
+  @@index([userId, createdAt])
+  @@map("projects")
+}
+
+model ProjectKey {
+  id         String    @id @default(uuid()) @db.Uuid
+  projectId  String    @map("project_id") @db.Uuid
+  keyHash    String    @unique @map("key_hash") @db.Char(64)
+  prefix     String    @db.VarChar(32)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, revokedAt])
+  @@index([prefix])
+  @@map("project_keys")
+}
+
+model ProjectAllowedOrigin {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  origin    String   @db.VarChar(2048)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, origin])
+  @@map("project_allowed_origins")
+}
+
+model Environment {
+  id        String    @id @default(uuid()) @db.Uuid
+  projectId String    @map("project_id") @db.Uuid
+  name      String    @db.VarChar(80)
+  slug      String    @db.VarChar(100)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  services  Service[]
+  traces    Trace[]
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@map("environments")
+}
+
+model Service {
+  id            String      @id @default(uuid()) @db.Uuid
+  projectId     String      @map("project_id") @db.Uuid
+  environmentId String      @map("environment_id") @db.Uuid
+  name          String      @db.VarChar(255)
+  type          ServiceType @default(UNKNOWN)
+  firstSeenAt   DateTime    @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt    DateTime    @map("last_seen_at") @db.Timestamptz(6)
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  rootTraces    Trace[]     @relation("RootTraceService")
+  spans         Span[]
+
+  @@unique([projectId, environmentId, name])
+  @@index([projectId, lastSeenAt])
+  @@index([environmentId, lastSeenAt])
+  @@map("services")
+}
+
+model Trace {
+  id              String      @id @default(uuid()) @db.Uuid
+  traceId         String      @map("trace_id") @db.Char(32)
+  projectId       String      @map("project_id") @db.Uuid
+  environmentId   String      @map("environment_id") @db.Uuid
+  serviceId       String?     @map("service_id") @db.Uuid
+  rootSpanName    String?     @map("root_span_name") @db.VarChar(512)
+  startedAt       DateTime    @map("started_at") @db.Timestamptz(6)
+  endedAt         DateTime    @map("ended_at") @db.Timestamptz(6)
+  durationMs      Decimal     @map("duration_ms") @db.Decimal(18, 3)
+  status          TraceStatus @default(UNSET)
+  firstReceivedAt DateTime    @default(now()) @map("first_received_at") @db.Timestamptz(6)
+  lastReceivedAt  DateTime    @default(now()) @map("last_received_at") @db.Timestamptz(6)
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment     Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  rootService     Service?    @relation("RootTraceService", fields: [serviceId], references: [id], onDelete: SetNull)
+  spans           Span[]
+
+  @@unique([projectId, traceId])
+  @@index([projectId, environmentId, startedAt(sort: Desc)])
+  @@index([projectId, durationMs(sort: Desc)])
+  @@index([projectId, status, startedAt(sort: Desc)])
+  @@index([serviceId, startedAt(sort: Desc)])
+  @@map("traces")
+}
+
+model Span {
+  id                 String         @id @default(uuid()) @db.Uuid
+  spanId             String         @map("span_id") @db.Char(16)
+  traceRecordId      String         @map("trace_record_id") @db.Uuid
+  parentSpanId       String?        @map("parent_span_id") @db.Char(16)
+  serviceId          String         @map("service_id") @db.Uuid
+  name               String         @db.VarChar(512)
+  kind               SpanKind       @default(UNSPECIFIED)
+  startedAt          DateTime       @map("started_at") @db.Timestamptz(6)
+  endedAt            DateTime       @map("ended_at") @db.Timestamptz(6)
+  durationMs         Decimal        @map("duration_ms") @db.Decimal(18, 3)
+  statusCode         SpanStatusCode @default(UNSET) @map("status_code")
+  statusMessage      String?        @map("status_message") @db.VarChar(2048)
+  attributes         Json           @default("{}") @db.JsonB
+  resourceAttributes Json           @default("{}") @map("resource_attributes") @db.JsonB
+  events             Json           @default("[]") @db.JsonB
+  links              Json           @default("[]") @db.JsonB
+  scopeName          String?        @map("scope_name") @db.VarChar(255)
+  scopeVersion       String?        @map("scope_version") @db.VarChar(80)
+  traceState         String?        @map("trace_state") @db.VarChar(512)
+  flags              Int            @default(0)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  trace              Trace          @relation(fields: [traceRecordId], references: [id], onDelete: Cascade)
+  service            Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([traceRecordId, spanId])
+  @@index([spanId])
+  @@index([parentSpanId])
+  @@index([serviceId, startedAt(sort: Desc)])
+  @@index([serviceId, durationMs(sort: Desc)])
+  @@index([statusCode, startedAt(sort: Desc)])
+  @@map("spans")
+}

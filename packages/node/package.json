@@ -1,0 +1,43 @@
+{
+  "name": "@tcc-observability/node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./trace-operation": {
+      "types": "./dist/trace-operation.d.ts",
+      "import": "./dist/trace-operation.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src test",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "0.80.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.221.0",
+    "@opentelemetry/resources": "2.10.0",
+    "@opentelemetry/sdk-node": "0.221.0",
+    "@opentelemetry/winston-transport": "0.32.0"
+  },
+  "devDependencies": {
+    "@swc/core": "1.16.1",
+    "@swc/jest": "0.2.39",
+    "@types/jest": "30.0.0",
+    "@types/node": "26.0.0",
+    "jest": "30.5.1",
+    "typescript": "5.9.3"
+  }
+}

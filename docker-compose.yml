@@ -1,0 +1,105 @@
+name: tcc-observability
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      API_PORT: 4000
+      INGESTION_GRPC_PORT: 4319
+      DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL com a conexão pooled do Neon}
+      JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-before-deploy}
+      NODE_ENV: development
+      PROJECT_KEY_PEPPER: ${PROJECT_KEY_PEPPER:-local-development-key-pepper-change-before-deploy}
+      TRACE_RETENTION_DAYS: ${TRACE_RETENTION_DAYS:-7}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        ['CMD', 'wget', '-q', '--spider', 'http://localhost:4000/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - '4000:4000'
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: builder
+    command:
+      [
+        'pnpm',
+        '--filter',
+        '@tcc-observability/database',
+        'prisma:migrate:deploy',
+      ]
+    environment:
+      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Defina DATABASE_URL_UNPOOLED com a conexão direta do Neon}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_URL: http://api:4000
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost/api
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.153.0
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    volumes:
+      - ./infrastructure/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+      - '13133:13133'
+
+  demo:
+    build:
+      context: .
+      dockerfile: apps/demo/Dockerfile
+    environment:
+      DEMO_DATABASE_URL: ${DEMO_DATABASE_URL:?Defina DEMO_DATABASE_URL com a conexão pooled do banco Neon da demonstração}
+      NODE_ENV: production
+      OBS_ENVIRONMENT: ${DEMO_OBS_ENVIRONMENT:-development}
+      OBS_PROJECT_KEY: ${DEMO_OBS_PROJECT_KEY:-}
+      OBS_SERVICE_NAME: ${DEMO_OBS_SERVICE_NAME:-demo-store-server}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test:
+        ['CMD', 'wget', '-q', '--spider', 'http://localhost:3100/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - '3100:3100'
+
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    ports:
+      - '80:80'
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro

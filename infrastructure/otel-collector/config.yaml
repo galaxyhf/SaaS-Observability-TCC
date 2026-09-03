@@ -1,0 +1,72 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  headers_setter/project_key:
+    headers:
+      - action: upsert
+        key: x-obs-project-key
+        from_context: x-obs-project-key
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        include_metadata: true
+      http:
+        endpoint: 0.0.0.0:4318
+        include_metadata: true
+        cors:
+          allowed_origins:
+            - http://localhost
+            - http://localhost:3000
+          allowed_headers:
+            - content-type
+            - traceparent
+            - tracestate
+            - x-obs-project-key
+            - x-obs-project-id
+          max_age: 7200
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  batch/traces:
+    send_batch_size: 512
+    send_batch_max_size: 1024
+    metadata_keys:
+      - x-obs-project-key
+    metadata_cardinality_limit: 100
+    timeout: 2s
+  batch:
+    send_batch_size: 512
+    send_batch_max_size: 1024
+    timeout: 2s
+
+exporters:
+  debug:
+    verbosity: basic
+  otlp/ingestion:
+    endpoint: api:4319
+    tls:
+      insecure: true
+    auth:
+      authenticator: headers_setter/project_key
+
+service:
+  extensions: [health_check, headers_setter/project_key]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch/traces]
+      exporters: [otlp/ingestion]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
