@@ -28,4 +28,16 @@ describe('Health endpoint', () => {
       .expect(200)
       .expect({ service: 'observability-api', status: 'ok' });
   });
+  it('requires real JWT authentication on the tracing routes', async () => {
+    const base = '/api/projects/bbfa5ef9-1324-44cc-b0d6-37b9f5a056de';
+    for (const suffix of [
+      '/traces',
+      '/services',
+      `/traces/${'a'.repeat(32)}`,
+    ]) {
+      await request(app.getHttpServer())
+        .get(base + suffix)
+        .expect(401);
+    }
+  });
 });

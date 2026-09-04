@@ -1,3 +1,5 @@
+import { TracingModule } from './tracing/tracing.module.js';
+
 import { Module } from '@nestjs/common';
 
 import { AuthModule } from './auth/auth.module.js';
@@ -19,6 +21,7 @@ import { SecurityModule } from './security/security.module.js';
     EnvironmentsModule,
     IngestionModule,
     HealthModule,
+    TracingModule,
   ],
 })
 export class AppModule {}

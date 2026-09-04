@@ -20,6 +20,7 @@ FROM base AS runner
 ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=dependencies /app/packages/database/node_modules ./packages/database/node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/packages/database/dist ./packages/database/dist
 COPY apps/api/src/ingestion/proto ./apps/api/dist/ingestion/proto

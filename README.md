@@ -28,7 +28,7 @@ A fundação, a camada administrativa e a ingestão de traces do MVP estão impl
 - SDK Node com exporter OTLP/HTTP, auto-instrumentação e spans manuais;
 - aplicação Next.js demonstrativa com cenários rápido, lento, erro, banco e pedido composto.
 
-As telas de consulta e waterfall de tracing são a próxima etapa funcional. Metrics e logs continuam no exporter `debug` e não são persistidos neste MVP.
+O dashboard de tracing inclui filtros, percentis, taxa de erro, volume temporal, operações mais lentas e waterfall com inspeção de spans. A próxima etapa funcional é retenção e hardening. Metrics e logs continuam no exporter `debug` e não são persistidos neste MVP.
 
 ## Arquitetura
 
@@ -125,7 +125,7 @@ As URLs contêm credenciais e devem permanecer apenas no `.env` local ou no gere
 
 A configuração fica em `infrastructure/otel-collector/config.yaml`. Os três pipelines estão declarados para preservar a evolução arquitetural, mas tracing é o único sinal persistido. Metrics e logs permanecem no exporter de diagnóstico.
 
-O pipeline definitivo de traces será:
+O pipeline implementado de traces é:
 
 ```text
 OTLP receiver → memory limiter → batch por Project Key → NestJS Ingestion → sanitização → PostgreSQL
@@ -215,6 +215,9 @@ GET    /api/auth/me
 POST   /api/projects
 GET    /api/projects
 GET    /api/projects/:projectId
+GET    /api/projects/:projectId/services
+GET    /api/projects/:projectId/traces
+GET    /api/projects/:projectId/traces/:traceId
 GET    /api/projects/:projectId/keys
 POST   /api/projects/:projectId/keys
 DELETE /api/projects/:projectId/keys/:keyId
@@ -236,3 +239,13 @@ O projeto utiliza Jest e Supertest. Cada etapa só avança após lint, typecheck
 - [Fluxo de telemetria](docs/telemetry-flow.md)
 - [Instrumentação](docs/instrumentation.md)
 - [Segurança](docs/security.md)
+
+## Dashboard de tracing — etapa 6
+
+Acesse `/login` para entrar ou cadastrar uma conta. Após o login, crie ou selecione um projeto. A Project Key aparece uma única vez e deve ser configurada apenas no servidor instrumentado. A tela inicial consulta as últimas 24 horas; filtros permitem selecionar período, ambiente, serviço participante, status, operação raiz e duração mínima.
+
+Os campos de data usam UTC, explicitamente indicado; os horários de leitura usam America/Sao_Paulo. Os filtros ficam na URL. A paginação e o retorno do detalhe preservam o intervalo exato. Clique em uma operação para abrir o waterfall e selecione um span para inspecionar atributos, eventos, links e mensagem de erro.
+
+O Next.js usa `API_URL` no servidor (padrão `http://localhost:4000`). O proxy de autenticação e criação de projetos mantém cookies HttpOnly na mesma origem em desenvolvimento; no Compose, o Nginx encaminha `/api` diretamente ao NestJS. Não é necessário expor o endereço interno da API ao navegador. Sessões expiradas podem ser renovadas pela opção “Renovar sessão” no login.
+
+Veja [docs/tracing-dashboard.md](docs/tracing-dashboard.md) para contratos, semântica dos indicadores e evidências de validação. A integração real Neon + Collector continua dependendo das credenciais do ambiente; os testes automatizados com repositórios simulados não comprovam essa integração.
