@@ -46,3 +46,7 @@ O identificador público não é segredo. Sua proteção depende de origens perm
 ## Logs internos
 
 Logs da plataforma não devem registrar bodies OTLP completos nem credenciais. Erros operacionais usarão IDs internos de lote/projeto e contagens, evitando copiar atributos potencialmente sensíveis.
+
+## Limites operacionais implementados na etapa 7
+
+A quota de ingestão é persistente, por projeto e minuto; tentativas de autenticação têm proteção por conta e IP, com as limitações de múltiplas instâncias documentadas. O transporte limita o payload, a ingestão limita spans distintos acumulados por trace e os logs do worker não incluem erros do driver nem atributos. Consulte [retenção e operação](retention-and-hardening.md) para defaults e validação.

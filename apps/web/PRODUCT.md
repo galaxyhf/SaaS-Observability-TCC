@@ -14,7 +14,7 @@ Localizar operações lentas e erros, correlacionar serviços e inspecionar o te
 
 ## Brand Personality
 
-Precisa, técnica e discreta, seguindo a direção da aplicação demonstrativa e os tokens existentes da plataforma.
+Clara, calma e precisa. A experiência deve ser compreensível sem domínio de OpenTelemetry. Termos técnicos permanecem em detalhes progressivos, seguindo os tokens de azul e neutros da plataforma.
 
 ## Anti-references
 
@@ -30,3 +30,7 @@ Evitar landing pages, terminal cenográfico, cards decorativos, gradientes e ani
 ## Accessibility & Inclusion
 
 WCAG AA, foco visível, teclado, contraste suficiente, estados anunciáveis e respeito à redução de movimento.
+
+## Direção aprovada pelo usuário
+
+Simplificar totalmente o dashboard: reduzir informação técnica visível, guiar a investigação e explicar volume, falhas e tempo de resposta em linguagem cotidiana.

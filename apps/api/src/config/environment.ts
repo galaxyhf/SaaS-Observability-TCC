@@ -8,6 +8,10 @@ interface AppEnvironment {
   NODE_ENV: 'development' | 'production' | 'test';
   PROJECT_KEY_PEPPER: string;
   TRACE_RETENTION_DAYS: number;
+  RETENTION_INTERVAL_SECONDS: number;
+  RETENTION_BATCH_SIZE: number;
+  RETENTION_MAX_BATCHES: number;
+  INGESTION_SPANS_PER_MINUTE: number;
 }
 
 const MINIMUM_SECRET_LENGTH = 32;
@@ -57,6 +61,18 @@ function positiveInteger(
   return value;
 }
 
+function boundedInteger(
+  values: Record<string, unknown>,
+  key: keyof AppEnvironment,
+  fallback: number,
+  max: number,
+): number {
+  const value = positiveInteger(values, key, fallback);
+  if (value > max)
+    throw new Error(`A variável ${key} deve ser no máximo ${max}.`);
+  return value;
+}
+
 export function validateEnvironment(
   values: Record<string, unknown>,
 ): AppEnvironment {
@@ -81,6 +97,35 @@ export function validateEnvironment(
     JWT_SECRET: secret(values, 'JWT_SECRET'),
     NODE_ENV: nodeEnvironment as AppEnvironment['NODE_ENV'],
     PROJECT_KEY_PEPPER: secret(values, 'PROJECT_KEY_PEPPER'),
-    TRACE_RETENTION_DAYS: positiveInteger(values, 'TRACE_RETENTION_DAYS', 7),
+    TRACE_RETENTION_DAYS: boundedInteger(
+      values,
+      'TRACE_RETENTION_DAYS',
+      7,
+      365,
+    ),
+    RETENTION_INTERVAL_SECONDS: boundedInteger(
+      values,
+      'RETENTION_INTERVAL_SECONDS',
+      3600,
+      86400,
+    ),
+    RETENTION_BATCH_SIZE: boundedInteger(
+      values,
+      'RETENTION_BATCH_SIZE',
+      100,
+      1000,
+    ),
+    RETENTION_MAX_BATCHES: boundedInteger(
+      values,
+      'RETENTION_MAX_BATCHES',
+      10,
+      100,
+    ),
+    INGESTION_SPANS_PER_MINUTE: boundedInteger(
+      values,
+      'INGESTION_SPANS_PER_MINUTE',
+      60000,
+      1000000,
+    ),
   };
 }

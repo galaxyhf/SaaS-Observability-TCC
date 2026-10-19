@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import type { Environment } from '@tcc-observability/database';
 
 import { PrismaService } from '../database/prisma.service.js';
@@ -25,6 +25,19 @@ export class EnvironmentsRepository {
     projectId: string;
     slug: string;
   }): Promise<Environment> {
-    return this.prisma.environment.create({ data });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const count = await tx.environment.count({
+          where: { projectId: data.projectId },
+        });
+        if (count >= 20)
+          throw new HttpException(
+            'Este projeto atingiu o limite de 20 ambientes.',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        return tx.environment.create({ data });
+      },
+      { isolationLevel: 'Serializable', timeout: 10000 },
+    );
   }
 }

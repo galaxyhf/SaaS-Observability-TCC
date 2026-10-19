@@ -62,7 +62,7 @@ export class TracingRepository {
           Prisma.sql`SELECT floor(extract(epoch FROM (t.started_at - ${from}::timestamptz)) / ${Math.max(1, (to.getTime() - from.getTime()) / 1000 / 24)})::int AS bucket, count(*)::int AS total, count(*) FILTER (WHERE t.status = 'ERROR')::int AS errors ${base} GROUP BY bucket ORDER BY bucket`,
         ),
       ],
-      { isolationLevel: 'RepeatableRead' },
+      { isolationLevel: 'RepeatableRead', timeout: 15000, maxWait: 5000 },
     );
     return {
       items,

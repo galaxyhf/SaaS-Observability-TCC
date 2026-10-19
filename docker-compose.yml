@@ -9,10 +9,14 @@ services:
       API_PORT: 4000
       INGESTION_GRPC_PORT: 4319
       DATABASE_URL: ${DATABASE_URL:?Defina DATABASE_URL com a conexão pooled do Neon}
-      JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-before-deploy}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com pelo menos 32 caracteres aleatórios}
       NODE_ENV: development
-      PROJECT_KEY_PEPPER: ${PROJECT_KEY_PEPPER:-local-development-key-pepper-change-before-deploy}
+      PROJECT_KEY_PEPPER: ${PROJECT_KEY_PEPPER:?Defina PROJECT_KEY_PEPPER com pelo menos 32 caracteres aleatórios}
       TRACE_RETENTION_DAYS: ${TRACE_RETENTION_DAYS:-7}
+      RETENTION_INTERVAL_SECONDS: ${RETENTION_INTERVAL_SECONDS:-3600}
+      RETENTION_BATCH_SIZE: ${RETENTION_BATCH_SIZE:-100}
+      RETENTION_MAX_BATCHES: ${RETENTION_MAX_BATCHES:-10}
+      INGESTION_SPANS_PER_MINUTE: ${INGESTION_SPANS_PER_MINUTE:-60000}
     depends_on:
       migrate:
         condition: service_completed_successfully

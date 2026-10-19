@@ -5,7 +5,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   description: 'Plataforma SaaS de observabilidade baseada em OpenTelemetry.',
-  title: 'TCC Observability',
+  title: 'Observa · Sua aplicação por dentro',
 };
 
 interface RootLayoutProps {

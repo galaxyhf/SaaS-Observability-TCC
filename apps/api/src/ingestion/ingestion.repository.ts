@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  GrpcResourceExhaustedException,
+  GrpcUnavailableException,
+} from '@nestjs/microservices';
 import type { Prisma } from '@tcc-observability/database';
 
 import { PrismaService } from '../database/prisma.service.js';
@@ -38,14 +43,58 @@ function json(value: SafeJson): Prisma.InputJsonValue {
 
 @Injectable()
 export class IngestionRepository {
-  public constructor(private readonly prisma: PrismaService) {}
+  public constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   public async persist(
     projectId: string,
     spans: NormalizedSpan[],
   ): Promise<void> {
+    if (!spans.length) return;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.persistBatch(projectId, spans);
+        return;
+      } catch (error) {
+        if (error instanceof GrpcResourceExhaustedException) throw error;
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'P2034' &&
+          attempt < 2
+        )
+          continue;
+        throw new GrpcUnavailableException(
+          'Telemetry storage temporarily unavailable. Retry later.',
+        );
+      }
+    }
+  }
+
+  private async persistBatch(
+    projectId: string,
+    spans: NormalizedSpan[],
+  ): Promise<void> {
     await this.prisma.$transaction(
       async (transaction) => {
+        const limit = this.config.getOrThrow<number>(
+          'INGESTION_SPANS_PER_MINUTE',
+        );
+        const quota = await transaction.$queryRaw<{ spans: number }[]>`
+          INSERT INTO ingestion_windows (project_id, window_started_at, spans)
+          SELECT ${projectId}::uuid, date_trunc('minute', CURRENT_TIMESTAMP), ${spans.length}::int
+          WHERE ${spans.length}::int <= ${limit}::int
+          ON CONFLICT (project_id, window_started_at) DO UPDATE
+          SET spans = ingestion_windows.spans + EXCLUDED.spans
+          WHERE ingestion_windows.spans + EXCLUDED.spans <= ${limit}::int
+          RETURNING spans`;
+        if (!quota.length)
+          throw new GrpcResourceExhaustedException(
+            'Project ingestion quota exceeded. Retry in the next minute.',
+          );
         const resolved = await this.resolveServices(
           transaction,
           projectId,
@@ -142,7 +191,9 @@ export class IngestionRepository {
 
     const count = await transaction.environment.count({ where: { projectId } });
     if (count >= MAX_ENVIRONMENTS_PER_PROJECT) {
-      throw new Error('Environment cardinality limit reached.');
+      throw new GrpcResourceExhaustedException(
+        'Environment cardinality limit reached.',
+      );
     }
     const created = await transaction.environment.upsert({
       create: {
@@ -193,7 +244,9 @@ export class IngestionRepository {
 
     const count = await transaction.service.count({ where: { environmentId } });
     if (count >= MAX_SERVICES_PER_ENVIRONMENT) {
-      throw new Error('Service cardinality limit reached.');
+      throw new GrpcResourceExhaustedException(
+        'Service cardinality limit reached.',
+      );
     }
     const created = await transaction.service.upsert({
       create: {
@@ -282,6 +335,16 @@ export class IngestionRepository {
           },
         });
 
+    const incomingIds = [...new Set(spans.map((span) => span.spanId))];
+    const existingCount = await transaction.span.count({
+      where: { traceRecordId: trace.id },
+    });
+    const duplicates = await transaction.span.count({
+      where: { traceRecordId: trace.id, spanId: { in: incomingIds } },
+    });
+    if (existingCount + incomingIds.length - duplicates > 2000) {
+      throw new GrpcResourceExhaustedException('Trace span limit reached.');
+    }
     await transaction.span.createMany({
       data: resolved.map(({ serviceId, span }) => ({
         attributes: json(span.attributes),

@@ -152,20 +152,41 @@ export function Logout() {
 export function CreateProject() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
   const [created, setCreated] = useState<{
     id: string;
     projectKey: string;
   } | null>(null);
   return created ? (
-    <section className="panel stack">
-      <h2>Projeto criado</h2>
+    <section className="created-project stack">
+      <h2>Projeto criado. Conecte sua aplicação.</h2>
       <p>
-        Guarde a Project Key no ambiente do servidor instrumentado. Ela será
-        exibida somente agora.
+        Guarde esta chave de conexão no servidor da sua aplicação. Ela aparece
+        somente agora e não deve ser compartilhada no navegador.
       </p>
       <code className="secret">{created.projectKey}</code>
+      <div className="copy-row">
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(created.projectKey);
+              setCopied(true);
+              setCopyError('');
+            } catch {
+              setCopyError('Selecione a chave acima e copie manualmente.');
+            }
+          }}
+        >
+          {copied ? 'Chave copiada' : 'Copiar chave'}
+        </button>
+        <span role="status" className="copy-feedback">
+          {copied ? 'Guarde em um local seguro.' : copyError}
+        </span>
+      </div>
       <Link className="button primary" href={`/?project=${created.id}`}>
-        Chave salva, abrir projeto
+        Guardei a chave, abrir projeto
       </Link>
     </section>
   ) : (

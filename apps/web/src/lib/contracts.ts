@@ -1,6 +1,7 @@
 export interface Project {
   id: string;
   name: string;
+  retentionDays?: number;
   environments: { id: string; name: string }[];
 }
 export interface TraceSummary {
@@ -57,7 +58,7 @@ export interface TraceDetail {
 export const duration = (value: number | null) =>
   value === null
     ? '—'
-    : `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(value)} ms`;
+    : `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: value >= 1000 ? 2 : 1 }).format(value >= 1000 ? value / 1000 : value)} ${value >= 1000 ? 's' : 'ms'}`;
 export const dateTime = (value: string) =>
   new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
@@ -65,4 +66,8 @@ export const dateTime = (value: string) =>
     timeZone: 'America/Sao_Paulo',
   }).format(new Date(value));
 export const statusLabel = (value: string) =>
-  value === 'ERROR' ? 'Erro' : value === 'OK' ? 'OK' : 'Não definido';
+  value === 'ERROR'
+    ? 'Com falha'
+    : value === 'OK'
+      ? 'Sucesso confirmado'
+      : 'Sem resultado informado';

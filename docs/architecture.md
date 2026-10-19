@@ -51,8 +51,8 @@ PostgreSQL é usado para dados administrativos e traces do MVP. O desenho privil
 3. projetos e credenciais;
 4. ingestão e persistência OTLP — concluída;
 5. SDK Node e aplicação demonstrativa — concluída;
-6. dashboard de tracing — implementado; validação integrada Neon/Collector pendente;
-7. retenção e hardening;
+6. dashboard de tracing — implementado; experiência simplificada em 19/10/2026;
+7. retenção e hardening — implementados e testados em branch Neon isolado; veja [operação](retention-and-hardening.md);
 8. browser SDK e correlação distribuída.
 
 ## Consultas de tracing

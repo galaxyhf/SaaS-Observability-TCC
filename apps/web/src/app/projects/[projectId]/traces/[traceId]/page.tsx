@@ -7,6 +7,8 @@ import {
   statusLabel,
   type TraceDetail,
 } from '../../../../../lib/contracts';
+import { workspaceHref } from '../../../../../lib/workspace-navigation';
+import { WorkspaceShell } from '../../../../../components/workspace-shell';
 import { Waterfall } from '../../../../../components/waterfall';
 
 export default async function TracePage({
@@ -25,15 +27,20 @@ export default async function TracePage({
   const { back } = await searchParams;
   const returnUrl =
     typeof back === 'string' && back.startsWith('/?')
-      ? back
-      : `/?project=${projectId}`;
+      ? workspaceHref(back, projectId, 'activities')
+      : workspaceHref('/', projectId, 'activities');
   return (
-    <main className="workspace">
-      <Link href={returnUrl}>← Voltar aos traces</Link>
+    <WorkspaceShell
+      projectId={projectId}
+      section="activities"
+      dashboardHref={returnUrl}
+    >
+      <Link className="trace-back" href={returnUrl}>
+        ← Voltar às atividades
+      </Link>
       <div className="heading">
         <div>
-          <h1>{trace.rootSpanName || 'Raiz não recebida'}</h1>
-          <p className="mono trace-id">{trace.traceId}</p>
+          <h1>{trace.rootSpanName || 'Atividade em processamento'}</h1>
         </div>
         <span className={`status ${trace.status.toLowerCase()}`}>
           {statusLabel(trace.status)}
@@ -43,7 +50,16 @@ export default async function TracePage({
         {trace.environment.name} · {dateTime(trace.startedAt)} (São Paulo) ·{' '}
         {duration(trace.durationMs)}
       </p>
+      <div className="trace-intro">
+        {trace.status === 'ERROR'
+          ? 'Esta atividade teve uma falha. A primeira etapa com erro já está selecionada abaixo.'
+          : 'Veja quanto tempo cada parte da aplicação levou. Selecione uma etapa para explorar os detalhes.'}
+      </div>
+      <details className="technical-details">
+        <summary>Identificador da atividade (Trace ID)</summary>
+        <p className="mono">{trace.traceId}</p>
+      </details>
       <Waterfall trace={trace} />
-    </main>
+    </WorkspaceShell>
   );
 }

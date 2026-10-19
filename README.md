@@ -28,7 +28,7 @@ A fundação, a camada administrativa e a ingestão de traces do MVP estão impl
 - SDK Node com exporter OTLP/HTTP, auto-instrumentação e spans manuais;
 - aplicação Next.js demonstrativa com cenários rápido, lento, erro, banco e pedido composto.
 
-O dashboard de tracing inclui filtros, percentis, taxa de erro, volume temporal, operações mais lentas e waterfall com inspeção de spans. A próxima etapa funcional é retenção e hardening. Metrics e logs continuam no exporter `debug` e não são persistidos neste MVP.
+O dashboard de tracing inclui filtros, percentis, taxa de erro, volume temporal, operações mais lentas e waterfall com inspeção de spans. A etapa 7 implementa retenção automática em lotes, quotas persistentes de ingestão e proteções operacionais. O dashboard foi redesenhado como Observa, com linguagem simples e detalhes técnicos progressivos. A próxima etapa funcional é o SDK browser e a correlação distribuída. Metrics e logs continuam no exporter `debug` e não são persistidos neste MVP.
 
 ## Arquitetura
 
@@ -239,13 +239,20 @@ O projeto utiliza Jest e Supertest. Cada etapa só avança após lint, typecheck
 - [Fluxo de telemetria](docs/telemetry-flow.md)
 - [Instrumentação](docs/instrumentation.md)
 - [Segurança](docs/security.md)
+- [Retenção e operação — etapa 7](docs/retention-and-hardening.md)
 
 ## Dashboard de tracing — etapa 6
 
 Acesse `/login` para entrar ou cadastrar uma conta. Após o login, crie ou selecione um projeto. A Project Key aparece uma única vez e deve ser configurada apenas no servidor instrumentado. A tela inicial consulta as últimas 24 horas; filtros permitem selecionar período, ambiente, serviço participante, status, operação raiz e duração mínima.
 
-Os campos de data usam UTC, explicitamente indicado; os horários de leitura usam America/Sao_Paulo. Os filtros ficam na URL. A paginação e o retorno do detalhe preservam o intervalo exato. Clique em uma operação para abrir o waterfall e selecione um span para inspecionar atributos, eventos, links e mensagem de erro.
+Os campos de data e os horários exibidos usam America/Sao_Paulo. Os filtros ficam na URL. A paginação e o retorno do detalhe preservam o intervalo exato. Clique em uma operação para abrir o waterfall e selecione um span para inspecionar atributos, eventos, links e mensagem de erro.
 
 O Next.js usa `API_URL` no servidor (padrão `http://localhost:4000`). O proxy de autenticação e criação de projetos mantém cookies HttpOnly na mesma origem em desenvolvimento; no Compose, o Nginx encaminha `/api` diretamente ao NestJS. Não é necessário expor o endereço interno da API ao navegador. Sessões expiradas podem ser renovadas pela opção “Renovar sessão” no login.
 
 Veja [docs/tracing-dashboard.md](docs/tracing-dashboard.md) para contratos, semântica dos indicadores e evidências de validação. A integração real Neon + Collector continua dependendo das credenciais do ambiente; os testes automatizados com repositórios simulados não comprovam essa integração.
+
+## Etapa 7 e nova experiência do dashboard
+
+A visão geral usa atividades, falhas e tempo típico como ponto de partida. Os atalhos “Com falha” e “Mais demoradas” ajudam a investigar. Filtros adicionais, percentis e identificadores técnicos permanecem disponíveis em detalhes expansíveis. Datas personalizadas usam o horário de São Paulo.
+
+A limpeza respeita a retenção de cada projeto (padrão de sete dias). Há quotas compartilhadas por projeto no banco, limite de spans por trace, proteção de login e timeouts. A nova migration precisa ser aplicada antes de iniciar a API; no Compose isso já é automático. Consulte [retenção e operação](docs/retention-and-hardening.md) para limites, configuração e evidências da validação no Neon.

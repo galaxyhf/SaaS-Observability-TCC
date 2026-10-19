@@ -24,7 +24,7 @@ Todos os endpoints exigem JWT do usuário e verificam ownership do projeto. Aus�
 
 Filtros: `from`, `to` (ISO 8601); `environmentId`, `serviceId` (UUID); `status` (`OK`, `ERROR`, `UNSET`); `operation` (trecho literal da operação raiz, sem distinção de caixa); `minDurationMs` (0 a 86.400.000); `sort` (`recent`, `slowest`); `page` (1 a 1.000).
 
-Sem período explícito, a consulta usa as últimas 24 horas. O intervalo é `[from, to)`, crescente e limitado a 31 dias. Datas sem offset vindas do formulário são interpretadas como UTC. A ordenação desempata por início e ID para manter paginação determinística. Resultados podem mudar durante ingestão concorrente; não há snapshot persistente entre páginas.
+Sem período explícito, a consulta usa as últimas 24 horas. O intervalo é `[from, to)`, crescente e limitado a 31 dias. Datas sem offset vindas do formulário são convertidas do horário de São Paulo para instantes ISO antes de consultar a API. A ordenação desempata por início e ID para manter paginação determinística. Resultados podem mudar durante ingestão concorrente; não há snapshot persistente entre páginas.
 
 ## Semântica dos indicadores
 
@@ -38,7 +38,7 @@ As operações são agrupadas pelo nome da operação raiz no recorte escolhido;
 
 O detalhe retorna no máximo 2.000 spans ordenados por início e span ID, informa a contagem total e sinaliza truncamento. Spans com pai ausente, autorreferência ou ciclo continuam visíveis. A travessia iterativa evita estouro de pilha; o recuo visual para hierarquias profundas é limitado. Barras são normalizadas e limitadas à extensão do trace. A posição usa datas JavaScript com precisão de milissegundo; duração numérica preserva três casas decimais do banco. Não há cálculo de tempo exclusivo nem inferência de causalidade além de parentSpanId.
 
-Limites de consulta e de quantidade não são um benchmark de escala. Retenção, otimização baseada em EXPLAIN e endurecimento operacional pertencem à etapa 7. A UI não renova sessão automaticamente: a ação de renovação é explícita no login.
+Limites de consulta e de quantidade não são um benchmark de escala. A etapa 7 implementou retenção, quotas, timeouts e validou o índice de paginação com EXPLAIN; consulte [retenção e operação](retention-and-hardening.md). A UI não renova sessão automaticamente: a ação de renovação é explícita no login.
 
 ## Validação desta entrega
 
@@ -61,3 +61,13 @@ Não havia `.env` Neon neste checkout. Portanto, a execução real das agregaç�
 6. Confirmar que uma segunda conta não consegue consultar os endpoints do primeiro projeto.
 
 O Next.js acessa cookies em Server Components pela API assíncrona, sem repassá-los em props: [documentação de cookies](https://nextjs.org/docs/app/api-reference/functions/cookies).
+
+## Revisão de experiência — 19/10/2026
+
+A interface agora se chama Observa e apresenta traces como “atividades” e spans como “etapas”. A visão geral prioriza quantidade, falhas e mediana do tempo de resposta, com atalhos de investigação. Filtros avançados e percentis ficam em detalhes expansíveis; nenhum indicador mudou de semântica. Os horários personalizados agora são interpretados em São Paulo, substituindo o formulário UTC descrito na entrega original. Datas absolutas nas URLs preservam o instante exato. IDs permanecem disponíveis no detalhe, sem ocupar a tabela principal. O waterfall abre com a primeira etapa com falha selecionada, ou a primeira etapa disponível.
+
+A validação de 19/10 incluiu a API e o Neon reais em branch isolado e atividades sintéticas enviadas por OTLP/gRPC, além dos testes de consultas e filtros. Isso complementa o registro original de fixtures acima. O Collector via Docker não foi reexecutado nesta revisão.
+
+## Correção da navegação
+
+A barra lateral abre telas distintas com `view=overview`, `view=activities` e `view=project`, substituindo as âncoras da revisão inicial. O destaque acompanha a tela atual. O contexto de projeto, período, filtros e paginação permanece nos links; o detalhe retorna à lista de atividades. A configuração do projeto abre diretamente e não consulta traces, evitando depender da carga de telemetria. A troca de projeto mantém a tela e limpa filtros específicos do projeto anterior.

@@ -1,5 +1,12 @@
 import Link from 'next/link';
-import { Activity } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowDownRight,
+  Clock3,
+  CircleAlert,
+  Radio,
+  ChevronRight,
+} from 'lucide-react';
 import { api } from '../lib/api';
 import {
   dateTime,
@@ -8,372 +15,533 @@ import {
   type Overview,
   type Project,
 } from '../lib/contracts';
-import { CreateProject, Logout } from '../components/account';
+import {
+  dashboardLink,
+  dashboardQuery,
+  searchValue,
+  type SearchValues,
+} from '../lib/dashboard-query';
+import { CreateProject } from '../components/account';
+import { WorkspaceShell } from '../components/workspace-shell';
+import {
+  DashboardHeading,
+  ProjectSettings,
+} from '../components/dashboard-sections';
+import { workspaceSection, workspaceHref } from '../lib/workspace-navigation';
+import { DashboardFilters } from '../components/dashboard-filters';
 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchValues>;
 }) {
   const params = await searchParams;
-  const value = (name: string) =>
-    typeof params[name] === 'string' ? (params[name] as string) : '';
+  const value = (key: string) => searchValue(params, key);
   const projects = await api<Project[]>('/projects');
   const project =
     projects.find((item) => item.id === value('project')) || projects[0];
   if (!project)
     return (
-      <main className="workspace">
-        <header className="topbar">
-          <h1>Seus projetos</h1>
-          <Logout />
-        </header>
-        <section className="panel empty">
+      <WorkspaceShell>
+        <div className="heading">
+          <div>
+            <p className="breadcrumb">Seu workspace</p>
+            <h1>Vamos acompanhar sua aplicação?</h1>
+            <p className="muted">
+              Comece com um projeto. Depois, acompanhe o que acontece nele.
+            </p>
+          </div>
+        </div>
+        <section className="onboarding panel">
+          <span className="empty-icon">
+            <Radio size={28} />
+          </span>
           <h2>Conecte sua primeira aplicação</h2>
-          <p>
-            Crie um projeto e use sua Project Key no SDK Node para começar a
-            receber traces.
+          <p className="muted">
+            Dê um nome ao projeto para gerar a chave de conexão. Ela será usada
+            no servidor da sua aplicação.
           </p>
           <CreateProject />
         </section>
-      </main>
+      </WorkspaceShell>
     );
-  const query = new URLSearchParams();
-  for (const key of [
-    'from',
-    'to',
-    'environmentId',
-    'serviceId',
-    'status',
-    'operation',
-    'minDurationMs',
-    'sort',
-    'page',
-  ])
-    if (value(key)) query.set(key, value(key));
+  const section = workspaceSection(value('view'));
+  if (section === 'project') {
+    const context = new URLSearchParams();
+    for (const key of [
+      'project',
+      'from',
+      'to',
+      'period',
+      'operation',
+      'environmentId',
+      'serviceId',
+      'status',
+      'minDurationMs',
+      'sort',
+      'page',
+    ])
+      if (value(key)) context.set(key, value(key));
+    return (
+      <WorkspaceShell
+        projectId={project.id}
+        section={section}
+        dashboardHref={`/?${context}`}
+      >
+        <DashboardHeading
+          projects={projects}
+          project={project}
+          section={section}
+        />
+        <ProjectSettings project={project} />
+      </WorkspaceShell>
+    );
+  }
+  const query = dashboardQuery(params);
   const [overview, services] = await Promise.all([
     api<Overview>(`/projects/${project.id}/traces?${query}`),
     api<{ id: string; name: string; environmentId: string }[]>(
       `/projects/${project.id}/services`,
     ),
   ]);
-  const link = (page: number) => {
-    const next = new URLSearchParams(query);
-    next.set('project', project.id);
-    next.set('page', String(page));
-    next.set('from', overview.from);
-    next.set('to', overview.to);
-    return `/?${next}`;
-  };
-  const back = link(overview.page);
+  query.set('from', overview.from);
+  query.set('to', overview.to);
+  query.set('view', section);
+  const href = (changes: Record<string, string | null> = {}) =>
+    dashboardLink(query, project.id, changes);
+  const back = href({ page: String(overview.page) });
   const { summary } = overview;
-  const maxVolume = Math.max(1, ...overview.series.map((item) => item.total));
+  const hasFilters = [
+    'operation',
+    'status',
+    'serviceId',
+    'environmentId',
+    'minDurationMs',
+  ].some((key) => value(key));
+  const hasReceivedData = services.length > 0;
+  const maxVolume = Math.max(1, ...overview.series.map((point) => point.total));
+  const errorRate = new Intl.NumberFormat('pt-BR', {
+    maximumFractionDigits: 1,
+  }).format(summary.total ? (summary.errors / summary.total) * 100 : 0);
+  const values = Object.fromEntries(
+    [
+      'from',
+      'to',
+      'period',
+      'operation',
+      'environmentId',
+      'serviceId',
+      'status',
+      'minDurationMs',
+      'sort',
+    ].map((key) => [key, value(key)]),
+  );
+  const view =
+    value('status') === 'ERROR'
+      ? 'errors'
+      : value('sort') === 'slowest' && value('minDurationMs') === '1000'
+        ? 'slow'
+        : 'all';
   return (
-    <main className="workspace">
-      <header className="topbar">
-        <Link className="brand" href="/">
-          <Activity size={20} aria-hidden="true" /> TCC Observability
-        </Link>
-        <Logout />
-      </header>
-      <div className="heading">
-        <div>
-          <h1>Traces</h1>
-          <p className="muted">
-            Investigue uma operação, do início ao último span.
-          </p>
-        </div>
-        <form action="/" className="actions">
-          <label>
-            Projeto
-            <select name="project" defaultValue={project.id}>
-              {projects.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button>Abrir</button>
-        </form>
-      </div>
-      <form className="filters panel" action="/">
-        <input type="hidden" name="project" value={project.id} />
-        <label>
-          De (UTC)
-          <input
-            type="datetime-local"
-            name="from"
-            defaultValue={overview.from.slice(0, 16)}
-            required
-          />
-        </label>
-        <label>
-          Até (UTC)
-          <input
-            type="datetime-local"
-            name="to"
-            defaultValue={overview.to.slice(0, 16)}
-            required
-          />
-        </label>
-        <label>
-          Ambiente
-          <select name="environmentId" defaultValue={value('environmentId')}>
-            <option value="">Todos</option>
-            {project.environments.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Serviço participante
-          <select name="serviceId" defaultValue={value('serviceId')}>
-            <option value="">Todos</option>
-            {services.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} ·{' '}
-                {
-                  project.environments.find(
-                    (env) => env.id === item.environmentId,
-                  )?.name
-                }
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Status
-          <select name="status" defaultValue={value('status')}>
-            <option value="">Todos</option>
-            <option value="ERROR">Erro</option>
-            <option value="OK">OK</option>
-            <option value="UNSET">Não definido</option>
-          </select>
-        </label>
-        <label>
-          Operação raiz
-          <input
-            name="operation"
-            placeholder="Buscar operação"
-            maxLength={512}
-            defaultValue={value('operation')}
-          />
-        </label>
-        <label>
-          Duração mínima (ms)
-          <input
-            name="minDurationMs"
-            type="number"
-            min="0"
-            max="86400000"
-            step="any"
-            defaultValue={value('minDurationMs')}
-          />
-        </label>
-        <label>
-          Ordenar
-          <select name="sort" defaultValue={value('sort') || 'recent'}>
-            <option value="recent">Mais recentes</option>
-            <option value="slowest">Mais lentos</option>
-          </select>
-        </label>
-        <button className="primary">Aplicar filtros</button>
-        <Link href={`/?project=${project.id}`}>Últimas 24 horas</Link>
-      </form>
-      <p className="muted period">
-        {dateTime(overview.from)} — {dateTime(overview.to)} (São Paulo).
-        Intervalo de até 31 dias.
+    <WorkspaceShell
+      projectId={project.id}
+      section={section}
+      dashboardHref={back}
+    >
+      <DashboardHeading
+        projects={projects}
+        project={project}
+        section={section}
+      />
+      <DashboardFilters
+        key={query.toString()}
+        section={section}
+        project={project}
+        services={services}
+        values={values}
+        from={overview.from}
+        to={overview.to}
+      />
+      <p className="period">
+        {dateTime(overview.from)} — {dateTime(overview.to)} · São Paulo
+        {hasFilters ? ' · Visão filtrada' : ''}
       </p>
-      <dl className="metrics">
-        {[
-          ['Traces', summary.total.toLocaleString('pt-BR')],
-          [
-            'Com erro',
-            `${summary.errors} (${summary.total ? ((summary.errors / summary.total) * 100).toFixed(1) : '0'}%)`,
-          ],
-          ['p50', duration(summary.p50)],
-          ['p95', duration(summary.p95)],
-          ['p99', duration(summary.p99)],
-        ].map(([label, text]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{text}</dd>
-          </div>
-        ))}
-      </dl>
-      <section className="panel">
-        <div className="section-title">
-          <h2>Volume no período</h2>
-          <span className="muted">24 intervalos · dados filtrados</span>
-        </div>
-        <div
-          className="volume"
-          role="img"
-          aria-label={`${summary.total} traces no período; ${summary.errors} com erro. Distribuição detalhada na tabela abaixo.`}
-        >
-          {Array.from({ length: 24 }, (_, bucket) => {
-            const item = overview.series.find(
-              (point) => point.bucket === bucket,
-            );
-            return (
-              <div
-                key={bucket}
-                title={`Intervalo ${bucket + 1}: ${item?.total || 0} traces, ${item?.errors || 0} com erro`}
-              >
-                <span
-                  style={{
-                    height: `${((item?.total || 0) / maxVolume) * 100}%`,
-                  }}
-                />
+      {section === 'overview' && (
+        <>
+          <section className="overview-strip" aria-label="Resumo do período">
+            <div>
+              <div className="metric-label">
+                <Radio size={16} aria-hidden="true" />
+                Atividades registradas
               </div>
-            );
-          })}
-        </div>
-        <details>
-          <summary>Ver distribuição em tabela</summary>
-          <table>
-            <thead>
-              <tr>
-                <th>Início (São Paulo)</th>
-                <th>Traces</th>
-                <th>Com erro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 24 }, (_, bucket) => {
-                const point = overview.series.find(
-                  (item) => item.bucket === bucket,
-                );
-                return (
-                  <tr key={bucket}>
-                    <td>
-                      {dateTime(
-                        new Date(
-                          Date.parse(overview.from) +
-                            (bucket *
-                              (Date.parse(overview.to) -
-                                Date.parse(overview.from))) /
-                              24,
-                        ).toISOString(),
-                      )}
-                    </td>
-                    <td>{point?.total || 0}</td>
-                    <td>{point?.errors || 0}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </details>
-      </section>
-      <section className="panel">
-        <div className="section-title">
-          <h2>Explorar traces</h2>
-          <span>{summary.total} resultados</span>
-        </div>
-        {!overview.items.length ? (
-          <div className="empty">
-            <h3>Nenhum trace neste recorte</h3>
-            <p>
-              Amplie o período ou remova filtros. Se ainda não há dados, execute
-              um cenário na aplicação demonstrativa com a Project Key deste
-              projeto.
-            </p>
-          </div>
-        ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Operação / Trace ID</th>
-                  <th>Serviço raiz</th>
-                  <th>Ambiente</th>
-                  <th>Início (São Paulo)</th>
-                  <th>Duração</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.items.map((trace) => (
-                  <tr key={trace.traceId}>
-                    <td>
+              <strong>{summary.total.toLocaleString('pt-BR')}</strong>
+              <p>Execuções acompanhadas no período</p>
+            </div>
+            <div>
+              <div className="metric-label">
+                <CircleAlert size={16} aria-hidden="true" />
+                Atividades com falha
+              </div>
+              <strong className={summary.errors ? 'error-ink' : ''}>
+                {summary.errors.toLocaleString('pt-BR')}
+                <small>{errorRate}% do total</small>
+              </strong>
+              <Link href={href({ status: 'ERROR', view: 'activities' })}>
+                Investigar falhas <ArrowRight size={13} aria-hidden="true" />
+              </Link>
+            </div>
+            <div>
+              <div className="metric-label">
+                <Clock3 size={16} aria-hidden="true" />
+                Tempo de resposta típico
+              </div>
+              <strong>{duration(summary.p50)}</strong>
+              <p>Metade das atividades levou até esse tempo</p>
+            </div>
+          </section>
+          <div className="insights-grid">
+            <section className="panel activity-chart">
+              <div className="section-title">
+                <div>
+                  <h2>Atividade ao longo do tempo</h2>
+                  <p className="muted">
+                    Volume de execuções e falhas no período selecionado.
+                  </p>
+                </div>
+                <span className="chart-legend">
+                  <i />
+                  Atividades
+                  <i className="error-dot" />
+                  Falhas
+                </span>
+              </div>
+              <div
+                className="volume"
+                role="img"
+                aria-label={`${summary.total} atividades, ${summary.errors} com falha. Valores por horário disponíveis na tabela abaixo.`}
+              >
+                {Array.from({ length: 24 }, (_, bucket) => {
+                  const point = overview.series.find(
+                    (item) => item.bucket === bucket,
+                  );
+                  const total = point?.total || 0,
+                    errors = point?.errors || 0;
+                  const start = new Date(
+                    Date.parse(overview.from) +
+                      (bucket *
+                        (Date.parse(overview.to) - Date.parse(overview.from))) /
+                        24,
+                  ).toISOString();
+                  return (
+                    <div
+                      key={bucket}
+                      title={`${dateTime(start)}: ${total} atividades, ${errors} falhas`}
+                    >
+                      <span
+                        className="volume-good"
+                        style={{
+                          height: `${((total - errors) / maxVolume) * 100}%`,
+                        }}
+                      />
+                      <span
+                        className="volume-error"
+                        style={{ height: `${(errors / maxVolume) * 100}%` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="chart-axis">
+                <span>{dateTime(overview.from)}</span>
+                <span>{dateTime(overview.to)}</span>
+              </div>
+              <details className="technical-details">
+                <summary>Ver valores por horário</summary>
+                <div className="table-scroll">
+                  <table>
+                    <caption className="sr-only">
+                      Atividade em 24 intervalos, no horário de São Paulo
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th>Horário</th>
+                        <th>Atividades</th>
+                        <th>Falhas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 24 }, (_, bucket) => {
+                        const point = overview.series.find(
+                          (item) => item.bucket === bucket,
+                        );
+                        return (
+                          <tr key={bucket}>
+                            <td>
+                              {dateTime(
+                                new Date(
+                                  Date.parse(overview.from) +
+                                    (bucket *
+                                      (Date.parse(overview.to) -
+                                        Date.parse(overview.from))) /
+                                      24,
+                                ).toISOString(),
+                              )}
+                            </td>
+                            <td>{point?.total || 0}</td>
+                            <td>{point?.errors || 0}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            <section className="panel slow-panel">
+              <div className="section-title">
+                <div>
+                  <h2>Onde demora mais</h2>
+                  <p className="muted">
+                    Atividades com os maiores tempos de resposta.
+                  </p>
+                </div>
+              </div>
+              {overview.operations.length ? (
+                <ol className="slow-list">
+                  {overview.operations.slice(0, 5).map((op) => (
+                    <li key={op.name}>
                       <Link
-                        href={`/projects/${project.id}/traces/${trace.traceId}?back=${encodeURIComponent(back)}`}
+                        href={href({
+                          operation: op.name,
+                          sort: 'slowest',
+                          view: 'activities',
+                        })}
                       >
-                        {trace.rootSpanName || 'Raiz não recebida'}
+                        <span>
+                          <strong>{op.name}</strong>
+                          <small>
+                            {op.total.toLocaleString('pt-BR')} execuções ·{' '}
+                            {op.errors} {op.errors === 1 ? 'falha' : 'falhas'}
+                          </small>
+                        </span>
+                        <span className="numeric">
+                          {duration(op.p95)}
+                          <ArrowDownRight size={14} aria-hidden="true" />
+                        </span>
                       </Link>
-                      <small className="mono">{trace.traceId}</small>
-                    </td>
-                    <td>{trace.serviceName || '—'}</td>
-                    <td>{trace.environmentName}</td>
-                    <td>{dateTime(trace.startedAt)}</td>
-                    <td className="numeric">{duration(trace.durationMs)}</td>
-                    <td>
-                      <span className={`status ${trace.status.toLowerCase()}`}>
-                        {statusLabel(trace.status)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="inline-empty">
+                  Quando houver atividades, você verá aqui onde o tempo foi
+                  gasto.
+                </p>
+              )}
+              <p className="helper">
+                Tempo em que 95% das execuções terminaram (p95). Nomes iguais
+                são agrupados.
+              </p>
+            </section>
           </div>
-        )}
-        <nav className="pagination" aria-label="Paginação">
-          {overview.page > 1 ? (
-            <Link href={link(overview.page - 1)}>← Anterior</Link>
-          ) : (
-            <span />
-          )}
-          <span>Página {overview.page} · até 50 traces</span>
-          {overview.page * 50 < summary.total && overview.page < 1000 ? (
-            <Link href={link(overview.page + 1)}>Próxima →</Link>
-          ) : (
-            <span />
-          )}
-        </nav>
-      </section>
-      <section className="panel">
-        <div className="section-title">
-          <h2>Operações mais lentas</h2>
-          <span className="muted">Até 20 · ordenadas por p95</span>
-        </div>
-        {overview.operations.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Operação raiz</th>
-                  <th>Traces</th>
-                  <th>Com erro</th>
-                  <th>p95</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.operations.map((op) => (
-                  <tr key={op.name}>
-                    <td>{op.name}</td>
-                    <td>{op.total}</td>
-                    <td>{op.errors}</td>
-                    <td>{duration(op.p95)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="actions">
+            <Link
+              className="button primary"
+              href={href({ view: 'activities' })}
+            >
+              Explorar todas as atividades{' '}
+              <ArrowRight size={14} aria-hidden="true" />
+            </Link>
           </div>
-        ) : (
-          <p className="empty">
-            As operações aparecerão quando houver traces neste período.
+        </>
+      )}
+      {section === 'activities' && (
+        <section className="panel activities-panel" id="activities">
+          <div className="section-title">
+            <div>
+              <h2>Explore as atividades</h2>
+              <p className="muted">
+                Abra uma execução para entender cada etapa.
+              </p>
+            </div>
+            <span className="count-label">
+              {summary.total.toLocaleString('pt-BR')} resultados
+            </span>
+          </div>
+          <nav className="view-tabs" aria-label="Tipo de atividade">
+            <Link
+              aria-current={view === 'all' ? 'page' : undefined}
+              href={href({ status: null, minDurationMs: null, sort: null })}
+            >
+              Todas
+            </Link>
+            <Link
+              aria-current={view === 'errors' ? 'page' : undefined}
+              href={href({ status: 'ERROR', minDurationMs: null, sort: null })}
+            >
+              Com falha
+            </Link>
+            <Link
+              aria-current={view === 'slow' ? 'page' : undefined}
+              href={href({
+                status: null,
+                minDurationMs: '1000',
+                sort: 'slowest',
+              })}
+            >
+              Mais demoradas <span>≥ 1 s</span>
+            </Link>
+          </nav>
+          {!overview.items.length ? (
+            <div className="empty">
+              <span className="empty-icon">
+                <Radio size={24} aria-hidden="true" />
+              </span>
+              <h3>
+                {hasFilters || hasReceivedData
+                  ? 'Nenhuma atividade neste período'
+                  : 'Aguardando as primeiras atividades'}
+              </h3>
+              <p>
+                {hasFilters || hasReceivedData
+                  ? 'Experimente outro período ou remova os filtros para encontrar mais resultados.'
+                  : 'Conecte sua aplicação com a chave do projeto e faça uma operação. As execuções aparecerão aqui assim que forem recebidas.'}
+              </p>
+              <Link
+                className="button"
+                href={
+                  hasFilters || hasReceivedData
+                    ? href({
+                        operation: null,
+                        environmentId: null,
+                        serviceId: null,
+                        status: null,
+                        minDurationMs: null,
+                        from: null,
+                        to: null,
+                        sort: null,
+                      })
+                    : workspaceHref(back, project.id, 'project')
+                }
+              >
+                {hasFilters || hasReceivedData
+                  ? 'Ver últimas 24 horas'
+                  : 'Como conectar a aplicação'}
+              </Link>
+            </div>
+          ) : (
+            <div className="table-scroll">
+              <table className="activity-table">
+                <thead>
+                  <tr>
+                    <th>Atividade</th>
+                    <th>Resultado</th>
+                    <th>Tempo de resposta</th>
+                    <th>Quando aconteceu</th>
+                    <th>
+                      <span className="sr-only">Detalhes</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.items.map((trace) => (
+                    <tr key={trace.traceId}>
+                      <td>
+                        <Link
+                          className="activity-name"
+                          href={`/projects/${project.id}/traces/${trace.traceId}?back=${encodeURIComponent(back)}`}
+                        >
+                          {trace.rootSpanName || 'Atividade em processamento'}
+                        </Link>
+                        <small>
+                          {trace.serviceName || 'Serviço não informado'} ·{' '}
+                          {trace.environmentName}
+                        </small>
+                      </td>
+                      <td>
+                        <span
+                          className={`status ${trace.status.toLowerCase()}`}
+                        >
+                          {statusLabel(trace.status)}
+                        </span>
+                      </td>
+                      <td className="numeric">
+                        <span className="duration-cell">
+                          {duration(trace.durationMs)}
+                          <span className="duration-meter" aria-hidden="true">
+                            <i
+                              style={{
+                                width: `${Math.max(3, Math.min(100, (trace.durationMs / Math.max(summary.p95 || 1, 1)) * 100))}%`,
+                              }}
+                            />
+                          </span>
+                        </span>
+                      </td>
+                      <td className="numeric">{dateTime(trace.startedAt)}</td>
+                      <td>
+                        <Link
+                          className="row-open"
+                          aria-label={`Ver detalhes de ${trace.rootSpanName || 'atividade'}`}
+                          href={`/projects/${project.id}/traces/${trace.traceId}?back=${encodeURIComponent(back)}`}
+                        >
+                          <ChevronRight size={18} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <nav className="pagination" aria-label="Paginação">
+            <span>
+              Página {overview.page} · {overview.pageSize} por página
+            </span>
+            <div>
+              {overview.page > 1 && (
+                <Link
+                  className="button"
+                  href={href({ page: String(overview.page - 1) })}
+                >
+                  Anterior
+                </Link>
+              )}
+              {overview.page * overview.pageSize < summary.total &&
+                overview.page < 1000 && (
+                  <Link
+                    className="button"
+                    href={href({ page: String(overview.page + 1) })}
+                  >
+                    Próxima <ArrowRight size={14} />
+                  </Link>
+                )}
+            </div>
+          </nav>
+        </section>
+      )}
+      {section === 'overview' && (
+        <details className="panel technical-details">
+          <summary>Indicadores detalhados de desempenho</summary>
+          <p className="muted">
+            Os percentis mostram o tempo em que uma parcela das atividades
+            terminou. Eles consideram todos os resultados filtrados.
           </p>
-        )}
-      </section>
-      <details className="panel">
-        <summary>Criar outro projeto</summary>
-        <CreateProject />
-      </details>
-    </main>
+          <dl className="percentiles">
+            <div>
+              <dt>50% terminaram em até · p50</dt>
+              <dd>{duration(summary.p50)}</dd>
+            </div>
+            <div>
+              <dt>95% terminaram em até · p95</dt>
+              <dd>{duration(summary.p95)}</dd>
+            </div>
+            <div>
+              <dt>99% terminaram em até · p99</dt>
+              <dd>{duration(summary.p99)}</dd>
+            </div>
+          </dl>
+        </details>
+      )}
+    </WorkspaceShell>
   );
 }

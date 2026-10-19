@@ -53,7 +53,7 @@ Percentis serão calculados pelo PostgreSQL com `percentile_cont(0.50)`, `percen
 
 ## Retenção
 
-Cada projeto terá uma quantidade de dias de retenção. Um processo recorrente excluirá traces vencidos em lotes; spans serão removidos por cascade. A rotina será idempotente e terá limite por execução.
+Cada projeto possui uma quantidade de dias de retenção. A API remove traces vencidos em lotes, com proteção de cinco minutos desde o último recebimento e cascade de spans. O trabalho tem limites por ciclo e coordenação transacional entre instâncias. `ingestion_windows` mantém quotas por projeto e minuto. Veja [retenção e operação](retention-and-hardening.md).
 
 ## Prisma e migrations
 
