@@ -7,6 +7,8 @@ export interface Project {
 export interface TraceSummary {
   traceId: string;
   rootSpanName: string | null;
+  category?: string;
+  rootAttributes?: unknown;
   startedAt: string;
   durationMs: number;
   status: string;

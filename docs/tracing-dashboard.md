@@ -71,3 +71,19 @@ A validação de 19/10 incluiu a API e o Neon reais em branch isolado e atividad
 ## Correção da navegação
 
 A barra lateral abre telas distintas com `view=overview`, `view=activities` e `view=project`, substituindo as âncoras da revisão inicial. O destaque acompanha a tela atual. O contexto de projeto, período, filtros e paginação permanece nos links; o detalhe retorna à lista de atividades. A configuração do projeto abre diretamente e não consulta traces, evitando depender da carga de telemetria. A troca de projeto mantém a tela e limpa filtros específicos do projeto anterior.
+
+## Correção de Atualizar visão — 19/10/2026
+
+O botão recalcula períodos relativos (1h/24h/7d) até o instante atual e consulta novamente a API mesmo quando a URL já está igual. A navegação entre telas e o retorno do detalhe continuam preservando o snapshot exato, mas agora mantêm também o modo de período para distinguir datas personalizadas de um preset. Um intervalo personalizado de exatamente 24 horas continua personalizado.
+
+Campos vazios, duração mínima zero e a ordenação padrão `recent` não são enviados como filtros ativos. O contador de “Mais filtros” considera somente serviço, resultado, duração positiva e ordenação por maior duração. Filtros escolhidos são preservados na atualização; a página volta à primeira página de resultados. O botão anuncia o estado de atualização e impede envios repetidos enquanto a consulta está pendente.
+
+A correção foi validada em Chromium no Docker: um trace novo gerado após abrir a tela apareceu ao clicar novamente no mesmo URL; filtros explícitos e datas personalizadas foram preservados e nenhum filtro extra foi ativado. A suíte web passou com 13 testes, além de lint, typecheck e build. A verificação real pode ser repetida com Observa no Docker e SQLVault na porta 3001:
+
+```bash
+pnpm --filter @tcc-observability/api exec node --env-file=/caminho/absoluto/observa/.env test/dashboard-refresh.integration.mjs
+```
+
+## Atividades legíveis — 20/10/2026
+
+A lista e o waterfall agora usam nomes apresentados em português com rotas normalizadas e rótulos opcionais. O filtro de tipo separa navegação, requisições, erros e outras operações antes da paginação. O detalhe resume a atividade e apresenta tempos por camada com união de intervalos, preservando os dados técnicos em seções expansíveis. Configuração, privacidade, limites e evidências em [Nomes de atividades](activity-names.md).

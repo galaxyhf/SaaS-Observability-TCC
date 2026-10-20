@@ -1,3 +1,7 @@
+import {
+  BrowserIngestionController,
+  BrowserOriginPolicy,
+} from './browser-ingestion.controller.js';
 import { Module } from '@nestjs/common';
 
 import { IngestionAuthRepository } from './ingestion-auth.repository.js';
@@ -9,8 +13,9 @@ import { OtlpMapper } from './otlp-mapper.js';
 import { TelemetrySanitizer } from './telemetry-sanitizer.js';
 
 @Module({
-  controllers: [IngestionController],
+  controllers: [IngestionController, BrowserIngestionController],
   providers: [
+    BrowserOriginPolicy,
     IngestionAuthRepository,
     IngestionAuthService,
     IngestionRepository,

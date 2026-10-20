@@ -87,6 +87,45 @@ export class ProjectsService {
     );
   }
 
+  public async browserConfig(userId: string, projectId: string) {
+    const project = await this.requireOwnedProject(userId, projectId);
+    const origins = await this.projectsRepository.listOrigins(projectId);
+    return {
+      publicId: project.publicId,
+      origins: origins.map((item) => item.origin),
+      endpointPath: `/api/browser/${project.publicId}/v1/traces`,
+    };
+  }
+
+  public async updateBrowserOrigins(
+    userId: string,
+    projectId: string,
+    origins: string[],
+  ) {
+    await this.requireOwnedProject(userId, projectId);
+    const normalized = origins.map((origin) => {
+      try {
+        const url = new URL(origin);
+        if (
+          !['http:', 'https:'].includes(url.protocol) ||
+          url.username ||
+          url.password ||
+          url.origin !== origin
+        )
+          throw new Error();
+        return url.origin;
+      } catch {
+        throw new BadRequestException(
+          'Informe origens exatas, sem caminho, credenciais ou barra final.',
+        );
+      }
+    });
+    await this.projectsRepository.replaceOrigins(projectId, [
+      ...new Set(normalized),
+    ]);
+    return this.browserConfig(userId, projectId);
+  }
+
   public async listKeys(
     userId: string,
     projectId: string,

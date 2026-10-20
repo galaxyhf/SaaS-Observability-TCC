@@ -1,4 +1,9 @@
-import { initObservability } from '@tcc-observability/node';
+import { createRequire } from 'node:module';
+
+// Mantenha o SDK fora do bundle para preservar os hooks nativos dos drivers.
+const { initObservability } = createRequire(import.meta.url)(
+  '@tcc-observability/node',
+) as typeof import('@tcc-observability/node');
 
 const projectKey = process.env.OBS_PROJECT_KEY;
 

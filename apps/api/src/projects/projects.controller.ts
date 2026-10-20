@@ -1,3 +1,4 @@
+import { BrowserOriginsDto } from './dto/browser-origins.dto.js';
 import {
   Body,
   Controller,
@@ -41,6 +42,28 @@ export class ProjectsController {
     @Param('projectId', new ParseUUIDPipe()) projectId: string,
   ) {
     return this.projectsService.get(user.id, projectId);
+  }
+
+  @Get(':projectId/browser')
+  public browserConfig(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+  ) {
+    return this.projectsService.browserConfig(user.id, projectId);
+  }
+
+  @Post(':projectId/browser/origins')
+  @HttpCode(200)
+  public updateBrowserOrigins(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Body() input: BrowserOriginsDto,
+  ) {
+    return this.projectsService.updateBrowserOrigins(
+      user.id,
+      projectId,
+      input.origins,
+    );
   }
 
   @Get(':projectId/keys')

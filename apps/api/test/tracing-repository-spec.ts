@@ -24,6 +24,7 @@ describe('Tracing SQL isolation and aggregation', () => {
       serviceId: 'service',
       environmentId: 'environment',
       status: 'ERROR',
+      category: 'error',
       minDurationMs: 50,
       page: 2,
     });
@@ -37,6 +38,7 @@ describe('Tracing SQL isolation and aggregation', () => {
           'service',
           'environment',
           'ERROR',
+          'error',
           50,
         ]),
       );

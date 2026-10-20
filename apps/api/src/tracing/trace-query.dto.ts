@@ -21,6 +21,9 @@ export class TraceQueryDto {
   @IsOptional() @IsIn(['OK', 'ERROR', 'UNSET']) public status?: string;
   @IsOptional() @IsString() @MaxLength(512) public operation?: string;
   @IsOptional()
+  @IsIn(['navigation', 'request', 'error', 'operation'])
+  public category?: string;
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

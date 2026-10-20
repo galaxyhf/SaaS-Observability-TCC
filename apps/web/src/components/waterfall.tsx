@@ -1,6 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { duration, statusLabel, type TraceDetail } from '../lib/contracts';
+import {
+  activityTitle,
+  spanLayer,
+  layerLabels,
+  timingBreakdown,
+} from '../lib/activity-presentation';
 import { waterfallRows } from '../lib/waterfall';
 
 export function Waterfall({ trace }: { trace: TraceDetail }) {
@@ -13,6 +19,35 @@ export function Waterfall({ trace }: { trace: TraceDetail }) {
   const span = trace.spans.find((item) => item.spanId === selected);
   return (
     <>
+      <section className="panel" aria-label="Onde o tempo foi gasto">
+        <h2>Onde o tempo foi gasto</h2>
+        <p className="muted">
+          Duração total: {duration(trace.durationMs)}. Tempos por parte podem se
+          sobrepor e não devem ser somados.
+        </p>
+        <dl className="span-fields timing-breakdown">
+          {timingBreakdown(trace)
+            .filter((item) => item.key !== 'other' || item.received)
+            .map((item) => (
+              <div key={item.key}>
+                <dt>{item.label}</dt>
+                <dd>
+                  {item.received
+                    ? duration(item.durationMs)
+                    : 'Sem etapas recebidas'}
+                </dd>
+              </div>
+            ))}
+        </dl>
+        <p className="muted">
+          O tempo do servidor inclui suas consultas ao banco. O tempo no
+          navegador pode incluir a espera pelo servidor. Ausência de etapas não
+          significa tempo zero.
+          {trace.truncated
+            ? ' Cálculo parcial: algumas etapas não foram carregadas.'
+            : ''}
+        </p>
+      </section>
       <section className="panel">
         <div className="section-title">
           <h2>O caminho desta atividade</h2>
@@ -52,10 +87,11 @@ export function Waterfall({ trace }: { trace: TraceDetail }) {
                   style={{ paddingLeft: `${Math.min(row.depth, 12) * 12}px` }}
                 >
                   <small>
-                    {row.span.service.name} · {statusLabel(row.span.statusCode)}
+                    {layerLabels[spanLayer(row.span)]} ·{' '}
+                    {statusLabel(row.span.statusCode)}
                   </small>
                   <strong>
-                    {row.span.name}
+                    {activityTitle(row.span.name, row.span.attributes)}
                     {row.incomplete ? ' *' : ''}
                   </strong>
                   <small>{duration(row.span.durationMs)}</small>
@@ -83,11 +119,11 @@ export function Waterfall({ trace }: { trace: TraceDetail }) {
       >
         {span ? (
           <>
-            <h2>{span.name}</h2>
+            <h2>{activityTitle(span.name, span.attributes)}</h2>
             <dl className="span-fields">
               <div>
                 <dt>Parte da aplicação</dt>
-                <dd>{span.service.name}</dd>
+                <dd>{layerLabels[spanLayer(span)]}</dd>
               </div>
               <div>
                 <dt>Tempo gasto</dt>
@@ -102,9 +138,16 @@ export function Waterfall({ trace }: { trace: TraceDetail }) {
               <p className="error-message">{span.statusMessage}</p>
             )}
             <details>
-              <summary>Identificadores técnicos</summary>
+              <summary>Detalhes técnicos da etapa</summary>
               <dl className="span-fields">
-                {' '}
+                <div>
+                  <dt>Nome original</dt>
+                  <dd>{span.name}</dd>
+                </div>
+                <div>
+                  <dt>Serviço</dt>
+                  <dd>{span.service.name}</dd>
+                </div>
                 <div>
                   <dt>Identificador da etapa</dt>
                   <dd className="mono">{span.spanId}</dd>

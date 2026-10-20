@@ -15,7 +15,7 @@
     "db:migrate:deploy": "pnpm --filter @tcc-observability/database prisma:migrate:deploy",
     "db:migrate:dev": "pnpm --filter @tcc-observability/database prisma:migrate:dev",
     "db:validate": "pnpm --filter @tcc-observability/database prisma:validate",
-    "predev": "pnpm --filter @tcc-observability/database --filter @tcc-observability/node build",
+    "predev": "pnpm --filter @tcc-observability/database --filter @tcc-observability/node --filter @tcc-observability/browser build",
     "dev": "pnpm --parallel --filter @tcc-observability/api --filter @tcc-observability/web --filter @tcc-observability/demo dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

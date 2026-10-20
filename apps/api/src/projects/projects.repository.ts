@@ -11,6 +11,26 @@ export type ProjectWithEnvironments = Prisma.ProjectGetPayload<{
 export class ProjectsRepository {
   public constructor(private readonly prisma: PrismaService) {}
 
+  public listOrigins(projectId: string) {
+    return this.prisma.projectAllowedOrigin.findMany({
+      where: { projectId },
+      select: { origin: true },
+      orderBy: { origin: 'asc' },
+    });
+  }
+
+  public replaceOrigins(projectId: string, origins: string[]) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.projectAllowedOrigin.deleteMany({ where: { projectId } });
+        await tx.projectAllowedOrigin.createMany({
+          data: origins.map((origin) => ({ projectId, origin })),
+        });
+      },
+      { isolationLevel: 'Serializable' },
+    );
+  }
+
   public slugExists(userId: string, slug: string): Promise<boolean> {
     return this.prisma.project
       .count({ where: { slug, userId } })

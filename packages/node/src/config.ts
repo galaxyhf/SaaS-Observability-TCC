@@ -1,4 +1,11 @@
+import {
+  validateRoutes,
+  type RouteLabel,
+} from '@tcc-observability/route-names';
 export interface ObservabilityConfig {
+  routes?: RouteLabel[];
+  /** strict remove SQL, URLs, mensagens, eventos e atributos fora de uma allowlist. */
+  privacyMode?: 'standard' | 'strict';
   /** Environment name, for example production, staging or development. */
   environment: string;
   /** OTLP/HTTP endpoint. A bare Collector URL receives /v1/traces automatically. */
@@ -12,6 +19,8 @@ export interface ObservabilityConfig {
 }
 
 export interface ValidatedObservabilityConfig {
+  routes?: RouteLabel[];
+  privacyMode: 'standard' | 'strict';
   endpoint: string;
   environment: string;
   projectKey: string;
@@ -58,6 +67,13 @@ export function normalizeTraceEndpoint(value: string): string {
 export function validateConfig(
   config: ObservabilityConfig,
 ): ValidatedObservabilityConfig {
+  if (
+    config.privacyMode !== undefined &&
+    !['standard', 'strict'].includes(config.privacyMode)
+  ) {
+    throw new Error('privacyMode must be standard or strict.');
+  }
+  validateRoutes(config.routes);
   const projectKey = required(config.projectKey, 'projectKey', 128);
   if (!projectKey.startsWith('obs_live_')) {
     throw new Error(
@@ -67,6 +83,8 @@ export function validateConfig(
 
   const serviceVersion = config.serviceVersion?.trim();
   return {
+    ...(config.routes ? { routes: config.routes } : {}),
+    privacyMode: config.privacyMode ?? 'standard',
     endpoint: normalizeTraceEndpoint(
       config.endpoint ??
         process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??

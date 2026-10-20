@@ -5,6 +5,28 @@ import { AuthRateLimit } from './security/auth-rate-limit.js';
 
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
+  const browserLimit = new AuthRateLimit();
+  app.use(
+    '/api/browser',
+    (
+      request: express.Request,
+      response: express.Response,
+      next: express.NextFunction,
+    ) => {
+      const wait = browserLimit.consume(
+        request.socket.remoteAddress ?? 'unknown',
+        120,
+      );
+      if (wait) {
+        response.setHeader('Retry-After', wait);
+        response.status(429).end();
+      } else next();
+    },
+  );
+  app.use(
+    '/api/browser',
+    express.raw({ type: 'application/x-protobuf', limit: '1mb' }),
+  );
   app.use(express.json({ limit: '32kb' }));
   app.use(cookieParser());
   app.use(new AuthRateLimit().middleware);

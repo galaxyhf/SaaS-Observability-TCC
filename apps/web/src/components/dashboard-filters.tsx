@@ -1,8 +1,14 @@
 'use client';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { localDateInput } from '../lib/dashboard-query';
+import {
+  advancedFilterCount,
+  dashboardFilterQuery,
+  dashboardPeriod,
+  localDateInput,
+} from '../lib/dashboard-query';
 import type { Project } from '../lib/contracts';
 
 export function DashboardFilters({
@@ -20,32 +26,30 @@ export function DashboardFilters({
   from: string;
   to: string;
 }) {
-  const interval = Date.parse(to) - Date.parse(from);
-  const matchingPreset =
-    interval === 3600000
-      ? '1h'
-      : interval === 86400000
-        ? '24h'
-        : interval === 604800000
-          ? '7d'
-          : 'custom';
-  const [period, setPeriod] = useState(
-    values.from || values.to ? matchingPreset : values.period || '24h',
-  );
-  const [periodChanged, setPeriodChanged] = useState(false);
-  const advanced = ['serviceId', 'status', 'minDurationMs', 'sort'].filter(
-    (key) => values[key],
-  ).length;
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [period, setPeriod] = useState(dashboardPeriod(values));
+  const advanced = advancedFilterCount(values);
   return (
-    <form action="/" className="filter-form">
+    <form
+      action="/"
+      className="filter-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const values = new URLSearchParams();
+        for (const [key, value] of new FormData(event.currentTarget)) {
+          if (typeof value === 'string') values.set(key, value);
+        }
+        const href = `/?${dashboardFilterQuery(values)}`;
+        startTransition(() => {
+          if (href === `${window.location.pathname}${window.location.search}`)
+            router.refresh();
+          else router.push(href, { scroll: false });
+        });
+      }}
+    >
       <input type="hidden" name="project" value={project.id} />
       <input type="hidden" name="view" value={section} />
-      {period !== 'custom' && !periodChanged && values.from && values.to && (
-        <>
-          <input type="hidden" name="from" value={from} />
-          <input type="hidden" name="to" value={to} />
-        </>
-      )}
       <div className="filter-toolbar">
         <label className="search-field">
           <span className="sr-only">Buscar atividade</span>
@@ -63,8 +67,7 @@ export function DashboardFilters({
             name="period"
             value={period}
             onChange={(event) => {
-              setPeriod(event.target.value);
-              setPeriodChanged(true);
+              setPeriod(event.target.value as typeof period);
             }}
           >
             <option value="1h">Última hora</option>
@@ -84,7 +87,14 @@ export function DashboardFilters({
             ))}
           </select>
         </label>
-        <button className="primary">Atualizar visão</button>
+        <button
+          className="primary"
+          type="submit"
+          disabled={isPending}
+          aria-busy={isPending}
+        >
+          {isPending ? 'Atualizando…' : 'Atualizar visão'}
+        </button>
       </div>
       {period === 'custom' && (
         <fieldset className="custom-period">
@@ -131,6 +141,16 @@ export function DashboardFilters({
                   }
                 </option>
               ))}
+            </select>
+          </label>
+          <label>
+            Tipo de atividade
+            <select name="category" defaultValue={values.category}>
+              <option value="">Todos os tipos</option>
+              <option value="navigation">Navegação</option>
+              <option value="request">Requisições</option>
+              <option value="error">Erros</option>
+              <option value="operation">Outras operações</option>
             </select>
           </label>
           <label>

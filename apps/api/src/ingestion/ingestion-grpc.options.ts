@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { MicroserviceOptions } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 
-function protoRoot(): string {
+export function protoRoot(): string {
   const currentDirectory = dirname(fileURLToPath(import.meta.url));
   const candidates = [
     join(currentDirectory, 'proto'),

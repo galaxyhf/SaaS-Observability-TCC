@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import { Pool } from 'pg';
+import { createRequire } from 'node:module';
+import type { Pool as PgPool } from 'pg';
+
+// O entrypoint ESM do pg não passa pelo hook CommonJS da instrumentação.
+// Carregue após register() para que o SDK intercepte Pool/Client no runtime Node.
+const { Pool } = createRequire(import.meta.url)('pg') as typeof import('pg');
 
 interface DemoDatabaseGlobal {
-  demoPool?: Pool;
+  demoPool?: PgPool;
   demoSchema?: Promise<void>;
 }
 
@@ -17,7 +22,7 @@ function connectionString(): string {
   return value;
 }
 
-export function databasePool(): Pool {
+export function databasePool(): PgPool {
   databaseGlobal.demoPool ??= new Pool({
     allowExitOnIdle: true,
     connectionString: connectionString(),

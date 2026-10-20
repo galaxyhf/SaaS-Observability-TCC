@@ -32,6 +32,7 @@ describe('Node SDK configuration', () => {
     });
 
     expect(config).toEqual({
+      privacyMode: 'standard',
       endpoint: 'http://collector:4318/v1/traces',
       environment: 'development',
       projectKey: 'obs_live_abcdefghijklmnopqrstuvwxyz',

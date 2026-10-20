@@ -28,7 +28,7 @@ A fundação, a camada administrativa e a ingestão de traces do MVP estão impl
 - SDK Node com exporter OTLP/HTTP, auto-instrumentação e spans manuais;
 - aplicação Next.js demonstrativa com cenários rápido, lento, erro, banco e pedido composto.
 
-O dashboard de tracing inclui filtros, percentis, taxa de erro, volume temporal, operações mais lentas e waterfall com inspeção de spans. A etapa 7 implementa retenção automática em lotes, quotas persistentes de ingestão e proteções operacionais. O dashboard foi redesenhado como Observa, com linguagem simples e detalhes técnicos progressivos. A próxima etapa funcional é o SDK browser e a correlação distribuída. Metrics e logs continuam no exporter `debug` e não são persistidos neste MVP.
+O dashboard de tracing inclui filtros, percentis, taxa de erro, volume temporal, operações mais lentas e waterfall com inspeção de spans. A etapa 7 implementa retenção automática em lotes, quotas persistentes de ingestão e proteções operacionais. O dashboard foi redesenhado como Observa, com linguagem simples e detalhes técnicos progressivos. A etapa 8 implementa o SDK browser e a correlação distribuída browser/backend, com ingestão pública restrita por origem. Metrics e logs continuam no exporter `debug` e não são persistidos neste MVP.
 
 ## Arquitetura
 
@@ -36,7 +36,8 @@ O dashboard de tracing inclui filtros, percentis, taxa de erro, volume temporal,
 flowchart LR
     Browser[Browser SDK] -->|OTLP/HTTP| Nginx
     Node[Node SDK] -->|OTLP HTTP ou gRPC| Collector
-    Nginx --> Collector[OpenTelemetry Collector]
+    Nginx -->|Node OTLP/HTTP| Collector[OpenTelemetry Collector]
+    Nginx -->|Browser OTLP/HTTP público| Ingestion
     Collector -->|OTLP/gRPC| Ingestion[NestJS Ingestion]
     Ingestion --> Processing[Processing e sanitização]
     Processing --> Postgres[(Neon PostgreSQL)]
@@ -160,7 +161,7 @@ const result = await traceOperation('order.process', async () => {
 
 Consulte [packages/node/README.md](packages/node/README.md) para a API e [apps/demo/README.md](apps/demo/README.md) para executar a demonstração.
 
-## Instrumentação browser planejada
+## Instrumentação browser
 
 ```ts
 import { initObservability } from '@tcc-observability/browser';
@@ -169,10 +170,13 @@ initObservability({
   projectId: 'obs_pub_public_identifier',
   serviceName: 'envcove-browser',
   environment: 'production',
+  endpoint: 'https://observa.example.com',
+  propagateToOrigins: ['https://api.example.com'],
+  sampleRate: 1,
 });
 ```
 
-O identificador browser será público e separado da Project Key privada.
+O identificador browser é público e separado da Project Key privada. Autorize as origens do site via `POST /api/projects/:projectId/browser/origins`. O backend deve usar a chave do mesmo projeto e ambiente, com outro nome de serviço. No Next.js, inicialize em `src/instrumentation-client.ts`. Veja [SDK browser e correlação — etapa 8](docs/browser-sdk.md).
 
 ## Estrutura
 
@@ -181,7 +185,7 @@ apps/api                  API e ingestão NestJS
 apps/web                  Dashboard Next.js
 apps/demo                 Aplicação Next.js instrumentada de demonstração
 packages/node             SDK Node.js implementado
-packages/browser          SDK browser, em prioridade 2
+packages/browser          SDK browser com fetch/XHR, navegação e erros
 packages/shared           Tipos e schemas compartilhados
 packages/database         Prisma e acesso ao banco
 infrastructure            Collector e Nginx
@@ -219,6 +223,8 @@ GET    /api/projects/:projectId/services
 GET    /api/projects/:projectId/traces
 GET    /api/projects/:projectId/traces/:traceId
 GET    /api/projects/:projectId/keys
+GET    /api/projects/:projectId/browser
+POST   /api/projects/:projectId/browser/origins
 POST   /api/projects/:projectId/keys
 DELETE /api/projects/:projectId/keys/:keyId
 
@@ -240,6 +246,7 @@ O projeto utiliza Jest e Supertest. Cada etapa só avança após lint, typecheck
 - [Instrumentação](docs/instrumentation.md)
 - [Segurança](docs/security.md)
 - [Retenção e operação — etapa 7](docs/retention-and-hardening.md)
+- [SDK browser e correlação — etapa 8](docs/browser-sdk.md)
 
 ## Dashboard de tracing — etapa 6
 
@@ -256,3 +263,7 @@ Veja [docs/tracing-dashboard.md](docs/tracing-dashboard.md) para contratos, sem�
 A visão geral usa atividades, falhas e tempo típico como ponto de partida. Os atalhos “Com falha” e “Mais demoradas” ajudam a investigar. Filtros adicionais, percentis e identificadores técnicos permanecem disponíveis em detalhes expansíveis. Datas personalizadas usam o horário de São Paulo.
 
 A limpeza respeita a retenção de cada projeto (padrão de sete dias). Há quotas compartilhadas por projeto no banco, limite de spans por trace, proteção de login e timeouts. A nova migration precisa ser aplicada antes de iniciar a API; no Compose isso já é automático. Consulte [retenção e operação](docs/retention-and-hardening.md) para limites, configuração e evidências da validação no Neon.
+
+### Nomes e leitura de atividades
+
+SDKs browser/Node reconhecem rotas normalizadas e aceitam rótulos opcionais por projeto. O dashboard diferencia navegação, requisições e erros e explica o tempo por camada. Consulte [a configuração e os limites](docs/activity-names.md).

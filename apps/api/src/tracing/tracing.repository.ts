@@ -28,10 +28,14 @@ export class TracingRepository {
       );
     if (query.status)
       conditions.push(Prisma.sql`t.status::text = ${query.status}`);
+    const rootAttributes = Prisma.sql`(SELECT s.attributes FROM spans s WHERE s.trace_record_id = t.id AND s.name = t.root_span_name AND s.service_id = t.service_id ORDER BY s.started_at, s.span_id LIMIT 1)`;
     if (query.operation)
       conditions.push(
-        Prisma.sql`strpos(lower(COALESCE(t.root_span_name, '')), lower(${query.operation})) > 0`,
+        Prisma.sql`(strpos(lower(COALESCE(t.root_span_name, '')), lower(${query.operation})) > 0 OR EXISTS (SELECT 1 FROM spans s WHERE s.trace_record_id = t.id AND s.service_id = t.service_id AND s.name = t.root_span_name AND strpos(lower(COALESCE(s.attributes->>'obs.operation.label', '')), lower(${query.operation})) > 0))`,
       );
+    const category = Prisma.sql`CASE WHEN t.status = 'ERROR' THEN 'error' WHEN t.root_span_name IN ('navigation', 'document.load') THEN 'navigation' WHEN t.root_span_name ~ '^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|HTTP) ' THEN 'request' ELSE 'operation' END`;
+    if (query.category)
+      conditions.push(Prisma.sql`${category} = ${query.category}`);
     if (query.minDurationMs !== undefined)
       conditions.push(Prisma.sql`t.duration_ms >= ${query.minDurationMs}`);
     const base = Prisma.sql`FROM traces t JOIN projects p ON p.id = t.project_id WHERE ${Prisma.join(conditions, ' AND ')}`;
@@ -42,7 +46,7 @@ export class TracingRepository {
     const [items, summary, operations, series] = await this.prisma.$transaction(
       [
         this.prisma.$queryRaw(
-          Prisma.sql`SELECT t.trace_id AS "traceId", t.root_span_name AS "rootSpanName", t.started_at AS "startedAt", t.duration_ms::float8 AS "durationMs", t.status, (SELECT name FROM services WHERE id = t.service_id) AS "serviceName", (SELECT name FROM environments WHERE id = t.environment_id) AS "environmentName" ${base} ORDER BY ${order} LIMIT 50 OFFSET ${(query.page - 1) * 50}`,
+          Prisma.sql`SELECT t.trace_id AS "traceId", t.root_span_name AS "rootSpanName", t.started_at AS "startedAt", t.duration_ms::float8 AS "durationMs", t.status, ${category} AS category, jsonb_build_object('http.route', ${rootAttributes}->>'http.route', 'obs.operation.label', ${rootAttributes}->>'obs.operation.label', 'obs.request.type', ${rootAttributes}->>'obs.request.type') AS "rootAttributes", (SELECT name FROM services WHERE id = t.service_id) AS "serviceName", (SELECT name FROM environments WHERE id = t.environment_id) AS "environmentName" ${base} ORDER BY ${order} LIMIT 50 OFFSET ${(query.page - 1) * 50}`,
         ),
         this.prisma.$queryRaw<
           Array<{

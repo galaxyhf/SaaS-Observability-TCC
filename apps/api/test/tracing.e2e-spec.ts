@@ -83,6 +83,7 @@ describe('Tracing REST boundary', () => {
     'minDurationMs=-1',
     'status=bad',
     'serviceId=bad',
+    'category=invalid',
     'from=not-a-date',
     'unknown=1',
   ])('rejects invalid query %s', async (query) => {

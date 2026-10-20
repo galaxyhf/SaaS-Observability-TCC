@@ -75,6 +75,10 @@ services:
     build:
       context: .
       dockerfile: apps/demo/Dockerfile
+      args:
+        NEXT_PUBLIC_OBS_PROJECT_ID: ${NEXT_PUBLIC_OBS_PROJECT_ID:-}
+        NEXT_PUBLIC_OBS_ENDPOINT: ${NEXT_PUBLIC_OBS_ENDPOINT:-http://localhost}
+        NEXT_PUBLIC_OBS_ENVIRONMENT: ${NEXT_PUBLIC_OBS_ENVIRONMENT:-development}
     environment:
       DEMO_DATABASE_URL: ${DEMO_DATABASE_URL:?Defina DEMO_DATABASE_URL com a conexão pooled do banco Neon da demonstração}
       NODE_ENV: production

@@ -41,7 +41,7 @@ A ingestão limita cada exportação a 2.000 spans, 64 atributos por objeto, arr
 
 ## Browser
 
-O identificador público não é segredo. Sua proteção depende de origens permitidas, quotas, sampling, rate limiting e validação. CORS controla navegadores, mas não impede clientes não-browser de enviar requisições.
+O identificador público não é segredo. O endpoint `/api/browser/:publicId/v1/traces` exige Origin cadastrado em cada requisição, aceita somente protobuf até 1 MiB e reutiliza as quotas persistentes da ingestão. A gestão de origens exige JWT e ownership; uma lista vazia bloqueia novas exportações. Sua proteção depende de origens permitidas, quotas, sampling, rate limiting e validação. CORS controla navegadores, mas não impede clientes não-browser de enviar requisições.
 
 ## Logs internos
 

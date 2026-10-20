@@ -38,3 +38,9 @@ DEMO_DATABASE_URL=postgresql://USUARIO:SENHA@ep-demo-pooler.REGIAO.aws.neon.tech
 | `POST /api/order`   | spans filhos de validação, estoque, pagamento e persistência |
 
 O app também funciona sem `OBS_PROJECT_KEY`, mas nesse modo não exporta traces. Essa tolerância permite subir a plataforma antes de criar o primeiro projeto; após obter a chave, reinicie o serviço demo.
+
+## Correlação browser/backend
+
+A demo inicializa o SDK browser pelo hook `instrumentation-client.ts` quando `NEXT_PUBLIC_OBS_PROJECT_ID` está configurado. Autorize `http://localhost:3100` no projeto e configure o identificador público e o ambiente do mesmo projeto da chave privada do servidor. O comando `dev` lê o `.env` raiz. No Docker, as variáveis públicas entram como build args e exigem reconstrução da demo. Veja o [guia da etapa 8](../../docs/browser-sdk.md).
+
+A validação Docker de 19/10/2026 passou nos cinco cenários, incluindo correlação navegador/servidor, spans SQL e waterfall. Para preservar a auto-instrumentação dos drivers, o hook de inicialização carrega o SDK Node nativamente e a configuração webpack o externaliza explicitamente. O driver `pg` também usa seu entrypoint CommonJS depois da inicialização do SDK.

@@ -1,3 +1,9 @@
+import {
+  activityTitle,
+  activityCategory,
+  activityExplanation,
+  environmentLabel,
+} from '../../../../../lib/activity-presentation';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { api } from '../../../../../lib/api';
@@ -29,6 +35,7 @@ export default async function TracePage({
     typeof back === 'string' && back.startsWith('/?')
       ? workspaceHref(back, projectId, 'activities')
       : workspaceHref('/', projectId, 'activities');
+  const root = trace.spans.find((span) => !span.parentSpanId) || trace.spans[0];
   return (
     <WorkspaceShell
       projectId={projectId}
@@ -40,23 +47,21 @@ export default async function TracePage({
       </Link>
       <div className="heading">
         <div>
-          <h1>{trace.rootSpanName || 'Atividade em processamento'}</h1>
+          <h1>{activityTitle(trace.rootSpanName, root?.attributes)}</h1>
         </div>
         <span className={`status ${trace.status.toLowerCase()}`}>
           {statusLabel(trace.status)}
         </span>
       </div>
       <p className="muted">
-        {trace.environment.name} · {dateTime(trace.startedAt)} (São Paulo) ·{' '}
-        {duration(trace.durationMs)}
+        {activityCategory(trace.rootSpanName, trace.status)} ·{' '}
+        {environmentLabel(trace.environment.name)} · {dateTime(trace.startedAt)}{' '}
+        (São Paulo) · {duration(trace.durationMs)}
       </p>
-      <div className="trace-intro">
-        {trace.status === 'ERROR'
-          ? 'Esta atividade teve uma falha. A primeira etapa com erro já está selecionada abaixo.'
-          : 'Veja quanto tempo cada parte da aplicação levou. Selecione uma etapa para explorar os detalhes.'}
-      </div>
+      <div className="trace-intro">{activityExplanation(trace)}</div>
       <details className="technical-details">
-        <summary>Identificador da atividade (Trace ID)</summary>
+        <summary>Nome original e identificador da atividade</summary>
+        <p>{trace.rootSpanName || 'Nome não recebido'}</p>
         <p className="mono">{trace.traceId}</p>
       </details>
       <Waterfall trace={trace} />

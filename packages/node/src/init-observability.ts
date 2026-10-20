@@ -1,3 +1,7 @@
+import {
+  strictPrivacyExporter,
+  routeNamingExporter,
+} from './privacy-exporter.js';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -25,6 +29,8 @@ function sameConfiguration(
   right: ValidatedObservabilityConfig,
 ): boolean {
   return (
+    JSON.stringify(left.routes ?? []) === JSON.stringify(right.routes ?? []) &&
+    left.privacyMode === right.privacyMode &&
     left.endpoint === right.endpoint &&
     left.environment === right.environment &&
     left.projectKey === right.projectKey &&
@@ -76,8 +82,14 @@ export function initObservability(
       }),
     ],
     resource,
+    ...(config.privacyMode === 'strict'
+      ? { metricReaders: [], logRecordProcessors: [] }
+      : {}),
     serviceName: config.serviceName,
-    traceExporter: exporter,
+    traceExporter:
+      config.privacyMode === 'strict'
+        ? strictPrivacyExporter(exporter, config.routes)
+        : routeNamingExporter(exporter, config.routes),
   });
 
   sdk.start();

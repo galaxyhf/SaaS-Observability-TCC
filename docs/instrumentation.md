@@ -46,12 +46,16 @@ O arquivo `instrumentation-node.ts` chama `initObservability`. Isso evita execut
 
 ## Browser
 
-O pacote browser, previsto para a prioridade 2, coletará carregamento de documento, fetch/XHR, navegação e erros seguros. Como a instrumentação browser do OpenTelemetry é experimental, a API pública do pacote ficará isolada das implementações internas.
+O pacote `@tcc-observability/browser` coleta carregamento de documento, fetch/XHR, navegação e ocorrências de erros, removendo dados sensíveis antes da exportação OTLP/HTTP protobuf. Usa um identificador público e origens cadastradas por projeto. A API pública do pacote isola as instrumentações browser experimentais do OpenTelemetry. Veja [etapa 8](browser-sdk.md) para configuração, limites e validação.
 
 ## Propagação
 
-O header `traceparent` segue W3C Trace Context. A propagação cross-origin terá allowlist explícita para evitar enviar contexto a destinos arbitrários.
+O header `traceparent` segue W3C Trace Context. A propagação cross-origin usa uma allowlist explícita para evitar enviar contexto a destinos arbitrários.
 
 ## Operações e cardinalidade
 
 O nome preferencial de uma operação HTTP é método mais rota parametrizada, como `GET /users/:id`. URLs completas, query strings e IDs individuais não devem criar operações distintas.
+
+### Driver PostgreSQL na demo Next.js
+
+O build standalone externaliza `pg`. A demo o carrega por `createRequire` após a inicialização do SDK, para que `Pool` e `Client` passem pelo hook CommonJS. O hook de inicialização também externaliza explicitamente `@tcc-observability/node` na configuração webpack: somente `serverExternalPackages` não preservava o SDK na camada de instrumentação do Next.js. O pacote standalone precisa conter os arquivos do SDK e seus plugins nativos, em vez de incorporá-los ao bundle. Importar o entrypoint ESM sem o loader de instrumentação produzia consultas funcionais sem spans SQL. Veja o [suporte oficial a ESM do OpenTelemetry](https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/esm-support.md).

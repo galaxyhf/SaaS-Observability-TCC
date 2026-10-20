@@ -5,3 +5,5 @@ coverage
 pnpm-lock.yaml
 apps/web/next-env.d.ts
 apps/demo/next-env.d.ts
+
+.impeccable/hook.cache.json

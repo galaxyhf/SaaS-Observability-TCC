@@ -13,6 +13,7 @@ export function dashboardQuery(
     'serviceId',
     'status',
     'operation',
+    'category',
     'minDurationMs',
     'sort',
     'page',
@@ -54,4 +55,67 @@ export function dashboardLink(
 }
 export function localDateInput(value: string) {
   return new Date(Date.parse(value) - 3 * 3600000).toISOString().slice(0, 16);
+}
+
+export function dashboardPeriod(
+  params: SearchValues,
+): '1h' | '24h' | '7d' | 'custom' {
+  const selected = searchValue(params, 'period');
+  if (
+    selected === '1h' ||
+    selected === '24h' ||
+    selected === '7d' ||
+    selected === 'custom'
+  )
+    return selected;
+  const from = searchValue(params, 'from');
+  const to = searchValue(params, 'to');
+  if (!from && !to) return '24h';
+  const interval = Date.parse(to) - Date.parse(from);
+  return interval === 3600000
+    ? '1h'
+    : interval === 86400000
+      ? '24h'
+      : interval === 604800000
+        ? '7d'
+        : 'custom';
+}
+
+/** Uma atualização relativa avança até agora; datas fixas só acompanham o modo custom. */
+export function dashboardFilterQuery(values: URLSearchParams): URLSearchParams {
+  const result = new URLSearchParams();
+  const period = values.get('period') || '24h';
+  for (const key of [
+    'project',
+    'view',
+    'period',
+    'operation',
+    'category',
+    'environmentId',
+    'serviceId',
+    'status',
+    'minDurationMs',
+    'sort',
+    'from',
+    'to',
+  ]) {
+    const value = values.get(key)?.trim();
+    if (
+      !value ||
+      (key === 'sort' && value === 'recent') ||
+      (key === 'minDurationMs' && Number(value) === 0)
+    )
+      continue;
+    if ((key === 'from' || key === 'to') && period !== 'custom') continue;
+    result.set(key, value);
+  }
+  return result;
+}
+
+export function advancedFilterCount(values: Record<string, string>): number {
+  return (
+    ['serviceId', 'status', 'category'].filter((key) => values[key]).length +
+    (Number(values.minDurationMs) > 0 ? 1 : 0) +
+    (values.sort === 'slowest' ? 1 : 0)
+  );
 }

@@ -48,24 +48,27 @@ Browser
 → SDK @tcc-observability/browser
 → OTLP/HTTP com identificador público
 → Nginx com rate limit
-→ Collector
-→ ingestão
+→ endpoint NestJS /api/browser/:publicId/v1/traces
+→ validação de origem e identificador público
+→ sanitização e quota compartilhadas
+→ persistência
 ```
 
-O projeto validará origem, quota e identificador público. CORS não será tratado como autenticação.
+O endpoint aceita OTLP/HTTP protobuf padrão, exige origem cadastrada e não recebe Project Key privada. CORS não é tratado como autenticação. Consulte a [etapa 8](browser-sdk.md).
 
 ## Correlação
 
 Instrumentações de fetch/XHR injetam `traceparent` apenas em origens permitidas. A instrumentação HTTP do backend extrai o contexto e cria um span filho. Instrumentações de PostgreSQL e clientes HTTP continuam a árvore.
 
 ```text
-Browser navigation
-└── fetch POST /api/order
-    └── HTTP POST /api/order
-        ├── order processing
-        ├── PostgreSQL SELECT
-        └── payment HTTP request
+fetch POST /api/order (browser)
+└── HTTP POST /api/order (servidor)
+    ├── order processing
+    ├── PostgreSQL SELECT
+    └── payment HTTP request
 ```
+
+Os spans de carregamento e navegação do browser são independentes. A correlação automática implementada liga fetch/XHR ao backend; não há vínculo automático com a resposta HTML inicial.
 
 ## Processamento fora de ordem
 

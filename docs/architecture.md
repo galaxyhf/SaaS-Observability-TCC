@@ -53,10 +53,14 @@ PostgreSQL é usado para dados administrativos e traces do MVP. O desenho privil
 5. SDK Node e aplicação demonstrativa — concluída;
 6. dashboard de tracing — implementado; experiência simplificada em 19/10/2026;
 7. retenção e hardening — implementados e testados em branch Neon isolado; veja [operação](retention-and-hardening.md);
-8. browser SDK e correlação distribuída.
+8. browser SDK e correlação distribuída — implementados; veja [etapa 8](browser-sdk.md).
 
 ## Consultas de tracing
 
 O módulo `TracingModule` separa controller REST, serviço de autorização e repositório. A autorização verifica ownership antes da leitura; as consultas SQL e Prisma também incluem projeto e usuário. Lista, percentis, operações e série temporal compartilham os mesmos filtros em uma transação `RepeatableRead`.
 
 O Next.js lê via Server Components sem cache de dados privados. Formulários GET mantêm filtros compartilháveis. Componentes cliente ficam restritos a autenticação/criação de projeto e seleção de spans. Um proxy de POST com rotas permitidas encaminha cookies e respeita a origem da requisição no acesso direto ao Next.js.
+
+## Ingestão browser
+
+O endpoint público OTLP/HTTP protobuf resolve o projeto pelo identificador público e exige origem cadastrada. Após validar o transporte, reutiliza o processamento e a persistência da ingestão privada, incluindo quotas. O browser não recebe Project Key nem usa a autenticação gRPC do Collector. W3C Trace Context correlaciona cada fetch/XHR ao serviço servidor no mesmo projeto.

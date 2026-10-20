@@ -40,3 +40,7 @@ Use spans manuais somente quando a etapa de negócio não for representada pelas
 - exportação OTLP/HTTP protobuf com Project Key em header;
 - parâmetros PostgreSQL e headers HTTP não são capturados;
 - encerramento do SDK disponível para shutdown gracioso.
+
+## Aplicações com SQL ou dados sensíveis
+
+Use `privacyMode: 'strict'` para exportar somente método/status HTTP, tipo de banco, identificação do serviço, tempos e IDs. SQL, parâmetros, URLs, headers, bodies, mensagens/stacks de erros, eventos, links, tracestate e atributos extras são removidos antes da exportação. Requisições preservam método e rota normalizada; nomes de consultas e operações internas continuam genéricos. Atributos de processo/host não são exportados. Metrics e logs automáticos ficam desativados nesse modo. Esse modo é usado pela integração SQLVault.

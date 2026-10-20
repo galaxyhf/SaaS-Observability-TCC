@@ -1,3 +1,8 @@
+import {
+  activityTitle,
+  activityCategory,
+  environmentLabel,
+} from '../lib/activity-presentation';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -17,6 +22,7 @@ import {
 } from '../lib/contracts';
 import {
   dashboardLink,
+  dashboardPeriod,
   dashboardQuery,
   searchValue,
   type SearchValues,
@@ -74,6 +80,7 @@ export default async function HomePage({
       'to',
       'period',
       'operation',
+      'category',
       'environmentId',
       'serviceId',
       'status',
@@ -107,11 +114,13 @@ export default async function HomePage({
   query.set('from', overview.from);
   query.set('to', overview.to);
   query.set('view', section);
+  query.set('period', dashboardPeriod(params));
   const href = (changes: Record<string, string | null> = {}) =>
     dashboardLink(query, project.id, changes);
   const back = href({ page: String(overview.page) });
   const { summary } = overview;
   const hasFilters = [
+    'category',
     'operation',
     'status',
     'serviceId',
@@ -129,6 +138,7 @@ export default async function HomePage({
       'to',
       'period',
       'operation',
+      'category',
       'environmentId',
       'serviceId',
       'status',
@@ -154,7 +164,7 @@ export default async function HomePage({
         section={section}
       />
       <DashboardFilters
-        key={query.toString()}
+        key={`${project.id}:${query.toString()}`}
         section={section}
         project={project}
         services={services}
@@ -309,7 +319,7 @@ export default async function HomePage({
               {overview.operations.length ? (
                 <ol className="slow-list">
                   {overview.operations.slice(0, 5).map((op) => (
-                    <li key={op.name}>
+                    <li key={activityTitle(op.name)}>
                       <Link
                         href={href({
                           operation: op.name,
@@ -318,7 +328,7 @@ export default async function HomePage({
                         })}
                       >
                         <span>
-                          <strong>{op.name}</strong>
+                          <strong>{activityTitle(op.name)}</strong>
                           <small>
                             {op.total.toLocaleString('pt-BR')} execuções ·{' '}
                             {op.errors} {op.errors === 1 ? 'falha' : 'falhas'}
@@ -361,14 +371,18 @@ export default async function HomePage({
             <div>
               <h2>Explore as atividades</h2>
               <p className="muted">
-                Abra uma execução para entender cada etapa.
+                Navegação, requisições e erros aparecem identificados.
+                Requisições também podem ocorrer em segundo plano.
               </p>
             </div>
             <span className="count-label">
               {summary.total.toLocaleString('pt-BR')} resultados
             </span>
           </div>
-          <nav className="view-tabs" aria-label="Tipo de atividade">
+          <nav
+            className="view-tabs"
+            aria-label="Filtrar por resultado e duração"
+          >
             <Link
               aria-current={view === 'all' ? 'page' : undefined}
               href={href({ status: null, minDurationMs: null, sort: null })}
@@ -413,12 +427,14 @@ export default async function HomePage({
                   hasFilters || hasReceivedData
                     ? href({
                         operation: null,
+                        category: null,
                         environmentId: null,
                         serviceId: null,
                         status: null,
                         minDurationMs: null,
                         from: null,
                         to: null,
+                        period: '24h',
                         sort: null,
                       })
                     : workspaceHref(back, project.id, 'project')
@@ -451,11 +467,17 @@ export default async function HomePage({
                           className="activity-name"
                           href={`/projects/${project.id}/traces/${trace.traceId}?back=${encodeURIComponent(back)}`}
                         >
-                          {trace.rootSpanName || 'Atividade em processamento'}
+                          {activityTitle(
+                            trace.rootSpanName,
+                            trace.rootAttributes,
+                          )}
                         </Link>
                         <small>
-                          {trace.serviceName || 'Serviço não informado'} ·{' '}
-                          {trace.environmentName}
+                          {activityCategory(trace.rootSpanName, trace.status)} ·{' '}
+                          {environmentLabel(trace.environmentName)}
+                        </small>
+                        <small>
+                          {trace.serviceName || 'Serviço não informado'}
                         </small>
                       </td>
                       <td>

@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "next build --webpack",
-    "predev": "pnpm --filter @tcc-observability/node build",
-    "dev": "next dev --port 3100",
+    "predev": "pnpm --filter @tcc-observability/node --filter @tcc-observability/browser build",
+    "dev": "node --env-file-if-exists=../../.env node_modules/next/dist/bin/next dev --port 3100",
     "lint": "eslint .",
     "start": "next start --port 3100",
     "test": "jest --runInBand",
@@ -18,7 +18,8 @@
     "next": "16.3.4",
     "pg": "8.23.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "@tcc-observability/browser": "workspace:*"
   },
   "devDependencies": {
     "@swc/core": "1.15.21",

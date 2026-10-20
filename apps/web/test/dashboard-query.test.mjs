@@ -4,6 +4,9 @@ import {
   dashboardQuery,
   dashboardLink,
   localDateInput,
+  dashboardPeriod,
+  dashboardFilterQuery,
+  advancedFilterCount,
 } from '../src/lib/dashboard-query.ts';
 const now = new Date('2026-10-19T15:00:00.000Z');
 test('presets produce precise periods and preserve the filter values', () => {
@@ -50,4 +53,82 @@ test('navigation retains the period and project, resets pagination and safely en
   assert.equal(url.searchParams.get('project'), 'project');
   assert.equal(url.searchParams.get('operation'), 'GET /a?x=1&y=2');
   assert.equal(url.searchParams.get('from'), q.get('from'));
+});
+
+test('refresh advances relative windows and removes defaults without activating filters', () => {
+  const old = dashboardQuery({ period: '24h' }, now);
+  const form = new URLSearchParams({
+    project: 'sqlvault',
+    view: 'activities',
+    period: '24h',
+    from: old.get('from'),
+    to: old.get('to'),
+    sort: 'recent',
+    status: '',
+    serviceId: '',
+    environmentId: '',
+    operation: '',
+    minDurationMs: '',
+  });
+  const refreshed = dashboardFilterQuery(form);
+  assert.deepEqual(Object.fromEntries(refreshed), {
+    project: 'sqlvault',
+    view: 'activities',
+    period: '24h',
+  });
+  const later = new Date(now.getTime() + 60000);
+  assert.equal(
+    dashboardQuery(Object.fromEntries(refreshed), later).get('to'),
+    later.toISOString(),
+  );
+  assert.equal(advancedFilterCount({ sort: 'recent', minDurationMs: '0' }), 0);
+  assert.equal(
+    advancedFilterCount({
+      status: 'ERROR',
+      serviceId: 'service',
+      minDurationMs: '1000',
+      sort: 'slowest',
+    }),
+    4,
+  );
+});
+test('refresh preserves selected filters and custom dates, even for a 24-hour custom window', () => {
+  const form = new URLSearchParams({
+    project: 'sqlvault',
+    view: 'overview',
+    period: 'custom',
+    from: '2026-10-18T09:30',
+    to: '2026-10-19T09:30',
+    status: 'ERROR',
+    serviceId: 'service',
+    minDurationMs: '1000',
+    sort: 'slowest',
+    operation: 'order.process',
+    page: '3',
+  });
+  const refreshed = dashboardFilterQuery(form);
+  assert.equal(refreshed.get('page'), null);
+  for (const key of [
+    'from',
+    'to',
+    'status',
+    'serviceId',
+    'minDurationMs',
+    'sort',
+    'operation',
+  ])
+    assert.equal(refreshed.get(key), form.get(key));
+  assert.equal(dashboardPeriod(Object.fromEntries(refreshed)), 'custom');
+  assert.equal(
+    dashboardPeriod({
+      period: '1h',
+      from: '2026-10-18T09:30',
+      to: '2026-10-19T09:30',
+    }),
+    '1h',
+  );
+  assert.equal(
+    dashboardPeriod({ from: '2026-10-18T09:30Z', to: '2026-10-19T09:30Z' }),
+    '24h',
+  );
 });
